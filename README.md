@@ -59,6 +59,15 @@ npm run preview
 
 The app builds to `dist/` and uses relative asset paths, so it can run under a GitHub Pages project path or another static host. No environment variables or server credentials belong in the build.
 
+For browser checks, install Chromium once, then run the workspace suite:
+
+```sh
+npx playwright install chromium
+npm run test:e2e
+```
+
+The suite uses a local simulated model server. It exercises streaming, selection locks, signature-preserving exports, mobile panel switching, light and dark themes, and reduced motion. Screenshots are saved in `test-results/`. CI keeps the browser report and screenshots for seven days.
+
 ## Deploy and contribute
 
 The Pages workflow tests and builds pushes to `main`, then uploads and deploys the static artifact. In repository **Settings → Pages**, choose **GitHub Actions** as the source. Pull requests run the checks without deploying.

@@ -3,9 +3,19 @@ import { basicSetup } from 'codemirror';
 import { Annotation, Compartment, EditorState, StateEffect, StateField } from '@codemirror/state';
 import { Decoration, EditorView, type DecorationSet } from '@codemirror/view';
 import { markdown } from '@codemirror/lang-markdown';
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { tags } from '@lezer/highlight';
 import type { Lock, Span } from './core/types';
 
 const external = Annotation.define<boolean>();
+const proseHighlight = HighlightStyle.define([
+  { tag: tags.heading, class: 'et-heading' },
+  { tag: [tags.link, tags.url], class: 'et-link' },
+  { tag: tags.monospace, class: 'et-code' },
+  { tag: tags.emphasis, class: 'et-emphasis' },
+  { tag: tags.strong, class: 'et-strong' },
+  { tag: [tags.processingInstruction, tags.meta], class: 'et-notation' },
+]);
 const setMarks = StateEffect.define<DecorationSet>();
 const marksField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
@@ -28,7 +38,7 @@ export function Editor(props: EditorProps) {
   latest.current = props;
   useEffect(() => {
     const v = new EditorView({ parent: host.current!, state: EditorState.create({ doc: latest.current.value, extensions: [
-      basicSetup, EditorView.lineWrapping, marksField,
+      basicSetup, EditorView.lineWrapping, marksField, syntaxHighlighting(proseHighlight),
       mode.current.of([]), language.current.of([]),
       EditorView.contentAttributes.of({ 'aria-label': props.label, spellcheck: 'false' }),
       EditorView.updateListener.of(update => {
