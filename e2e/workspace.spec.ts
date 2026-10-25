@@ -99,13 +99,14 @@ test('email import keeps the detected signature exactly in the export', async ({
   await page.goto('/'); await connect(page, modelServer.url);
   const email = 'Hi Alex,\n\nPlease review the deployment plan before our next discussion.\n\nBest regards,\nMayank Raj\nEngineering\n';
   await page.locator('input[type=file]').setInputFiles({ name: 'email.txt', mimeType: 'text/plain', buffer: Buffer.from(email) });
+  await expect(page.getByRole('textbox', { name: 'Original draft' })).toContainText('Mayank Raj');
   await page.getByRole('combobox', { name: 'Editing preset' }).selectOption('email');
   await page.getByRole('button', { name: 'Edit draft' }).click();
   await expect(page.getByText('Edit complete. Every lock checked.')).toBeVisible();
   const pending = page.waitForEvent('download'); await page.getByRole('button', { name: 'Export' }).click();
   const download = await pending;
   expect(await readFile((await download.path())!, 'utf8')).toBe(email.replace('Please review', 'Please check'));
-  expect(modelServer.requests.at(-1)!.messages[1].content).not.toContain('Mayank Raj');
+  for (const request of modelServer.requests) expect(request.messages[1].content).not.toContain('Mayank Raj');
 });
 
 test('broken locks retain the original passage and show a review flag', async ({ page, modelServer }, info) => {
