@@ -5,6 +5,7 @@ import type { Connection, Issue, Lock } from './types';
 
 const PROTOCOL = `You are editing one passage from a document. Return only its edited text.
 Preserve the argument, factual certainty, technical names, and paragraph structure.
+Heading words may be edited; their protected Markdown markers must stay unchanged.
 Each [[ET_...]] marker is protected text. Copy every marker EXACTLY ONCE, in its original order.
 Do not change marker spelling, insert other markers, wrap the result in a code block, add headings,
 or add explanations. Protected line breaks must stay as markers. Do not add new line breaks.
@@ -60,7 +61,11 @@ export async function editDocument(
         }
       }
     }
-    if (!accepted) { parts[i] = unit.source; issues.push({ from: unit.from, to: unit.to, message: reason + ' Original kept.' }); }
+    if (!accepted) {
+      parts[i] = unit.source;
+      const outputFrom = prefix(i).length;
+      issues.push({ from: unit.from, to: unit.to, outputFrom, outputTo: outputFrom + unit.source.length, message: reason + ' Original kept.' });
+    }
     done++; preview = prefix(i + 1); emit();
   }
   return { text: parts.join(''), preview: parts.join(''), streamed: receivedText, issues, done, total, retry: false };

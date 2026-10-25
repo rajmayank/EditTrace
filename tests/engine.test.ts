@@ -36,12 +36,12 @@ describe('checked editing', () => {
       onText(result); return result;
     });
     const result = await editDocument(source, autoLocks(source, 'markdown', DEFAULT_LOCKS), connection, 'Light edit.', new AbortController().signal, () => {}, generate);
-    expect(generate).toHaveBeenCalledTimes(3);
+    expect(generate).toHaveBeenCalledTimes(4);
     expect(result.text).toContain('42 ports'); expect(result.text).toContain('precisely');
     expect(result.issues).toHaveLength(0); expect(result.text.startsWith('# Title\n\n')).toBe(true);
   });
   it('retains only the failed original passage after one retry', async () => {
-    const generate: typeof complete = vi.fn(async (_c, _system, text) => text.includes('ET_') ? text.replace(/\[\[ET_[^\]]+\]\]/g, '') : text.replace('useful', 'helpful'));
+    const generate: typeof complete = vi.fn(async (_c, _system, text) => text.includes('clearly') ? text.replace(/\[\[ET_[^\]]+\]\]/g, '') : text.replace('useful', 'helpful'));
     const result = await editDocument(source, autoLocks(source, 'markdown', DEFAULT_LOCKS), connection, '', new AbortController().signal, () => {}, generate);
     expect(result.issues).toHaveLength(1); expect(result.text).toContain('42 ports');
     expect(result.text).toContain('helpful point'); expect(result.issues[0].message).toContain('Original kept');
@@ -73,6 +73,21 @@ describe('checked editing', () => {
   it('rejects new paragraph breaks and severe shortening', async () => {
     const generate: typeof complete = async () => 'Summary.\n\nNew paragraph.';
     const result = await editDocument(source, autoLocks(source, 'markdown', DEFAULT_LOCKS), connection, '', new AbortController().signal, () => {}, generate);
-    expect(result.text).toBe(source); expect(result.issues).toHaveLength(2);
+    expect(result.text).toBe(source); expect(result.issues).toHaveLength(3);
+  });
+  it('edits heading words while preserving ATX prefixes, closing markers, setext underlines, and CRLF', async () => {
+    const text = '# A closer look at limits\r\n\r\n## Older title ##\r\n\r\nOlder setext title\r\n===\r\n';
+    const generate: typeof complete = async (_c, _s, input) => input.replace('A closer look at limits', 'Connection limits explained').replaceAll('Older', 'Clearer');
+    const result = await editDocument(text, autoLocks(text, 'markdown', DEFAULT_LOCKS), connection, '', new AbortController().signal, () => {}, generate);
+    expect(result.text).toBe(text.replace('A closer look at limits', 'Connection limits explained').replaceAll('Older', 'Clearer'));
+    expect(result.issues).toHaveLength(0);
+  });
+  it('locates a retained passage in output after earlier edits change its offset', async () => {
+    const text = 'An older introduction with useful details.\n\nThe limit is 42 ports and must remain precise.\n';
+    const generate: typeof complete = async (_c, _s, input) => input.includes('ET_') ? input.replace(/\[\[ET_[^\]]+\]\]/g, '') : input.replace('older', 'clearer and considerably longer');
+    const result = await editDocument(text, autoLocks(text, 'text', DEFAULT_LOCKS), connection, '', new AbortController().signal, () => {}, generate);
+    const issue = result.issues[0];
+    expect(issue.outputFrom).toBeGreaterThan(issue.from);
+    expect(result.text.slice(issue.outputFrom, issue.outputTo)).toBe(text.slice(issue.from, issue.to));
   });
 });

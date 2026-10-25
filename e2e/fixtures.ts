@@ -28,10 +28,12 @@ export const test = base.extend<{ resetModel: void }, { modelServer: ModelServer
       let body = ''; for await (const data of req) body += data;
       const request = JSON.parse(body); requests.push(request);
       let text = request.messages.at(-1).content
+        .replace('A closer look at connection limits', 'Connection limits, explained')
         .replace('client can have room', 'application can have capacity')
         .replace('A concrete trace', 'A specific trace')
         .replace('Please review', 'Please check');
       if (request.model === 'break-locks') text = text.replace(/\[\[ET_[^\]]+\]\]/g, 'CHANGED');
+      if (text.includes('MUST_RETAIN')) text += '<p>';
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
       const chunks = text.match(/[\s\S]{1,16}/g) ?? [];
       const start = () => {
