@@ -15,7 +15,7 @@ import type { GenerationStats } from './core/metrics';
 import { estimateReading } from './core/reading';
 import { editDocument, PassageStateError, retryPassage, type Progress } from './core/engine';
 import { DEFAULT_LOCKS, type Connection, type Format, type Issue, type Reveal, type Span } from './core/types';
-import { PRESETS, SAMPLE } from './core/presets';
+import { draftTitle, PRESETS, SAMPLE } from './core/presets';
 import { persistSettings, read, remove, write, type Draft, type SavedSettings } from './core/storage';
 
 const DEFAULT_CONNECTION: Connection = { url: 'http://localhost:1234/v1', model: '', key: '', temperature: 0.3, maxTokens: 4096 };
@@ -33,7 +33,7 @@ export default function App() {
   const [source, setSource] = useState(initial?.source ?? '');
   const [output, setOutput] = useState(initial?.output ?? '');
   const [format, setFormat] = useState<Format>(initial?.format ?? 'markdown');
-  const [name, setName] = useState(initial?.name ?? 'Untitled draft');
+  const [name, setName] = useState(() => draftTitle(initial?.name));
   const [manual, setManual] = useState<Span[]>(initial?.manual ?? []);
   const [selection, setSelection] = useState<Span>({ from: 0, to: 0 });
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -262,7 +262,7 @@ export default function App() {
     if (busy) return;
     clearReveal();
     setStats(entry.stats ?? null);
-    setSource(entry.source); setOutput(entry.output); setManual(entry.manual); setFormat(entry.format); setName(entry.name); setProgress(null); setIssues(entry.issues ?? []); setStatus('Restored from history.'); setPanel(null);
+    setSource(entry.source); setOutput(entry.output); setManual(entry.manual); setFormat(entry.format); setName(draftTitle(entry.name)); setProgress(null); setIssues(entry.issues ?? []); setStatus('Restored from history.'); setPanel(null);
   }
 
   return <div className="app-shell">

@@ -222,7 +222,9 @@ dialog[open]::backdrop { animation: backdrop-enter 180ms ease-out both; }
   .brand-mark { width: 26px; height: 28px; padding-left: 5px; }
   .connection-pill { max-width: 110px; }
   .top-actions { gap: 2px; }
-  .document-actions { gap: 2px; }
+  .document-bar { flex-wrap: wrap; }
+  .document-title { flex-basis: 100%; }
+  .document-actions { gap: 2px; margin-left: auto; }
   .document-actions button { padding: 5px; }
   .document-title input { font-size: 19px; }
   .word-count { display: none !important; }

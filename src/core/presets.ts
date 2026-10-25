@@ -1,4 +1,21 @@
 import type { Format } from './types';
+
+const DRAFT_TITLES = [
+  'Draft in motion',
+  'First spark draft',
+  'Fresh ink draft',
+  'Taking shape draft',
+  'Still brewing draft',
+  'Rough cut draft',
+  'Early thoughts draft',
+  'Next chapter draft',
+] as const;
+
+export function draftTitle(savedTitle?: string): string {
+  if (savedTitle?.trim() && savedTitle !== 'Untitled draft') return savedTitle;
+  return DRAFT_TITLES[Math.floor(Math.random() * DRAFT_TITLES.length)];
+}
+
 export const PRESETS: { id: string; name: string; format: Format; prompt: string }[] = [
   { id: 'article', name: 'Technical article', format: 'markdown', prompt: 'Lightly copyedit this long-form technical article. Preserve its reasoning, depth, first-person perspective, examples, and precise terminology. Keep definite claims definite and qualified claims qualified. Improve awkward or repetitive phrasing. Leave effective sentences unchanged. Do not summarize, add facts, add slang, or make the tone promotional.' },
   { id: 'markdown', name: 'Markdown edit', format: 'markdown', prompt: 'Edit this Markdown document for clarity and flow. Preserve heading levels, paragraph order, list structure, links, code, emphasis, and factual content. Heading wording may be improved. Improve prose without condensing the document or changing its purpose. Leave useful detail and effective sentences in place.' },
