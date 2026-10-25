@@ -1,9 +1,9 @@
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { diffWordsWithSpace } from 'diff';
 import { ArrowRight, ArrowUpRight, Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, CircleCheck, CircleAlert, Clipboard, Copy, Download, FilePenLine, FileUp, History, Link2, LockKeyhole, MessageSquarePlus, Moon, Play, Plus, RotateCcw, Settings2, ShieldCheck, Square, Sun, Trash2, Unlink, Unplug, X } from 'lucide-react';
 import { Editor } from './Editor';
 import { Preview } from './Preview';
 import { autoLocks } from './core/protection';
+import { createDocumentDiffer } from './core/diff';
 import { clipOutputLocks, resolveOutputLocks } from './core/output';
 import { baseURL, connectionError } from './core/api';
 import { PROVIDERS, providerFor } from './core/providers';
@@ -62,25 +62,16 @@ export default function App() {
   const sourceRef = useRef(source); sourceRef.current = source;
   const inlineSession = useRef<string | null>(null);
   const readableSource = useDeferredValue(source), readableOutput = useDeferredValue(output);
-  const comparedOutput = rightTab === 'edit' ? readableOutput : output;
   const originalReading = useMemo(() => estimateReading(readableSource, format), [readableSource, format]);
   const editedReading = useMemo(() => estimateReading(readableOutput, format), [readableOutput, format]);
   const locks = useMemo(() => autoLocks(source, format, settings.locks, manual), [source, format, settings.locks, manual]);
   const resultProtection = useMemo(() => resolveOutputLocks(source, output, locks, outputLocks), [source, output, locks, outputLocks]);
   const resultState = useRef({ output, locks: resultProtection.locks, issues });
   resultState.current = { output, locks: resultProtection.locks, issues };
-  const diff = useMemo(() => {
-    const before: Span[] = [], after: Span[] = [];
-    if (!comparedOutput || busy || !showDiff) return { before, after };
-    let a = 0, b = 0;
-    const changes = diffWordsWithSpace(source, comparedOutput, { timeout: rightTab === 'edit' ? 100 : 1200 });
-    for (const part of changes ?? []) {
-      if (part.removed) { before.push({ from: a, to: a + part.value.length }); a += part.value.length; }
-      else if (part.added) { after.push({ from: b, to: b + part.value.length }); b += part.value.length; }
-      else { a += part.value.length; b += part.value.length; }
-    }
-    return { before, after };
-  }, [source, comparedOutput, busy, showDiff, rightTab]);
+  const compare = useMemo(createDocumentDiffer, []);
+  const diff = useMemo(() => hasResult && !busy && showDiff
+    ? compare(source, output, resultProtection.locks)
+    : { before: [], after: [] }, [source, output, resultProtection.locks, hasResult, busy, showDiff, compare]);
   const modelConnection = useModelConnection(settings.connection, settings.connectionEnabled !== false, found => {
     setSettings(s => ({ ...s, connection: { ...s.connection, model: found.includes(s.connection.model) ? s.connection.model : found[0] } }));
   });
@@ -353,7 +344,7 @@ export default function App() {
           <header className="panel-header"><div className="panel-title"><span className="panel-number">02</span><h2>Edited</h2>{hasResult && <ReadingStats estimate={editedReading} label="Edited" />}</div><div className="segmented" role="group" aria-label="Edited view"><button className={rightTab === 'changes' ? 'active' : ''} onClick={() => resultView('changes')}>Changes</button><button className={rightTab === 'read' ? 'active' : ''} onClick={() => resultView('read')}>Read</button>{hasResult && <button className={rightTab === 'edit' ? 'active' : ''} aria-pressed={rightTab === 'edit'} title={busy ? 'Available after generation finishes.' : !resultProtection.complete ? 'Run a fresh edit to refresh protected ranges.' : rightTab === 'edit' ? 'Finish editing and review the changes.' : 'Edit the result. Blue text stays locked.'} disabled={busy || !resultProtection.complete} onClick={() => resultView(rightTab === 'edit' ? 'changes' : 'edit')}>Edit</button>}</div></header>
           {output && !busy && !resultProtection.complete && <p className="result-edit-note">Run a fresh edit to refresh protected ranges before editing inline.</p>}
           <div className="editor-body">
-            {hasResult ? <><div className="result-source" hidden={rightTab === 'read' && format === 'markdown'}><Editor label="Edited result" value={output} scrollRef={rightTab === 'read' && format === 'markdown' ? undefined : scrolling.edited} readOnly={busy || rightTab !== 'edit' || !resultProtection.complete} lockEdits locks={resultProtection.locks} onChange={changeOutput} onBlockedEdit={() => setNotice('Protected text stays locked. Change or unlock it in Original.')} isMarkdown={format === 'markdown'} changes={rightTab !== 'read' && comparedOutput === output ? diff.after : []} changeKind="added" retained={issues.map(issue => ({ from: issue.outputFrom, to: issue.outputTo }))} reveal={resultReveal} /></div>{rightTab === 'read' && format === 'markdown' && <Preview value={output} scrollRef={scrolling.edited} />}</> : busy ? <div className="waiting-result" role="status"><span className="spinner" />Waiting for your model…</div> : <div className="empty-result"><span className="empty-result-symbol"><FilePenLine size={27} strokeWidth={1.4} /></span><p>Protected structure.<br />Visible changes.</p><span>Each passage is checked for protected text and structural changes.</span><div className="diff-key"><span><i className="removed-key" />Removed</span><span><i className="added-key" />Added</span><span><i className="locked-key" />Protected</span></div></div>}
+            {hasResult ? <><div className="result-source" hidden={rightTab === 'read' && format === 'markdown'}><Editor label="Edited result" value={output} scrollRef={rightTab === 'read' && format === 'markdown' ? undefined : scrolling.edited} readOnly={busy || rightTab !== 'edit' || !resultProtection.complete} lockEdits locks={resultProtection.locks} onChange={changeOutput} onBlockedEdit={() => setNotice('Protected text stays locked. Change or unlock it in Original.')} isMarkdown={format === 'markdown'} changes={rightTab !== 'read' ? diff.after : []} changeKind="added" retained={issues.map(issue => ({ from: issue.outputFrom, to: issue.outputTo }))} reveal={resultReveal} /></div>{rightTab === 'read' && format === 'markdown' && <Preview value={output} scrollRef={scrolling.edited} />}</> : busy ? <div className="waiting-result" role="status"><span className="spinner" />Waiting for your model…</div> : <div className="empty-result"><span className="empty-result-symbol"><FilePenLine size={27} strokeWidth={1.4} /></span><p>Protected structure.<br />Visible changes.</p><span>Each passage is checked for protected text and structural changes.</span><div className="diff-key"><span><i className="removed-key" />Removed</span><span><i className="added-key" />Added</span><span><i className="locked-key" />Protected</span></div></div>}
           </div>
           {!!issues.length && (!busy || retrying !== null) && <RetainedReview issues={issues} source={source} active={resultReveal} onLocate={locateRetained} onRetry={issue => void retryOne(issue)} retrying={retrying} />}
           <footer className="panel-footer"><div className="footer-actions"><button onClick={() => void copy(output)} disabled={!output || busy}><Copy size={14} />Copy</button><button onClick={() => download(output)} disabled={!output || busy}><Download size={14} />Export</button></div><button className="text-button" disabled={!output || busy} onClick={() => { if (window.confirm('Use this edit as the new draft?')) { replaceSource(output); } }}><Check size={14} />Use as draft</button></footer>
@@ -364,7 +355,7 @@ export default function App() {
         <div className="edit-feedback"><div className="edit-status" role="status" aria-live="polite">{busy ? <><span className="spinner" />{retrying !== null ? progress?.retry ? 'Checking passage locks again' : 'Retrying passage' : progress?.retry ? 'Checking locks again' : 'Editing'}{retrying === null && <span className="muted">{progress?.done ?? 0}/{progress?.total ?? '…'} passages</span>}</> : status ? <span>{status}</span> : <><LockKeyhole size={15} /><span>Select text to keep it word for word.</span></>}</div>{stats && <OutputRate stats={stats} active={busy} />}</div>
         <button id="run-edit" className={'primary-button ' + (busy ? 'stop-button' : '')} disabled={!busy && !source.trim()} onClick={() => void run()}>{busy ? <Square size={14} fill="currentColor" strokeWidth={0} /> : <Play size={15} fill="currentColor" />}{busy ? 'Stop' : 'Edit draft'}{!busy && <kbd>{shortcut} ↵</kbd>}</button>
       </div>
-      {output && !busy && <div className="review-bar"><label className="check-label"><input type="checkbox" checked={showDiff} onChange={e => setShowDiff(e.target.checked)} />Show changes</label><div className="change-navigation"><span>{showDiff && comparedOutput !== source && !diff.before.length && !diff.after.length ? rightTab === 'edit' ? 'Open Changes to refresh the diff.' : 'Diff unavailable for this draft.' : <>{diff.before.length} removals · {diff.after.length} additions</>}</span><button aria-label="Previous change" disabled={!diff.before.length} onClick={() => navigateChange(-1)}><ChevronLeft size={15} /></button><button aria-label="Next change" disabled={!diff.before.length} onClick={() => navigateChange(1)}><ChevronRight size={15} /></button></div></div>}
+      {hasResult && !busy && <div className="review-bar"><label className="check-label"><input type="checkbox" checked={showDiff} onChange={e => setShowDiff(e.target.checked)} />Show changes</label><div className="change-navigation"><span>{diff.before.length} removals · {diff.after.length} additions</span><button aria-label="Previous change" disabled={!diff.before.length} onClick={() => navigateChange(-1)}><ChevronLeft size={15} /></button><button aria-label="Next change" disabled={!diff.before.length} onClick={() => navigateChange(1)}><ChevronRight size={15} /></button></div></div>}
       <footer className="app-footer"><span className="attribution">Built and maintained by <a href="https://mayankraj.com" target="_blank" rel="noreferrer">Mayank Raj</a></span><div className="footer-links"><a href="https://github.com/rajmayank/EditTrace" target="_blank" rel="noreferrer">GitHub repo<ArrowUpRight size={11} /></a><span>Apache 2.0</span></div></footer>
     </main>
     {notice && <div className="toast" role="status"><span>{notice}</span><button aria-label="Dismiss notification" onClick={() => setNotice('')}><X size={14} /></button></div>}
