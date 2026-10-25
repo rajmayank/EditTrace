@@ -1,4 +1,4 @@
-.workspace-preferences { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; margin: -9px 0 19px; }
+.workspace-preferences { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; margin: 0; }
 .workspace-preferences .privacy-note { margin: 0; }
 .save-drafts-control { flex-shrink: 0; white-space: nowrap; }
 .panel-title { flex-wrap: wrap; column-gap: 9px; row-gap: 4px; }
@@ -21,7 +21,7 @@
   .workspace-preferences { flex-wrap: wrap; }
 }
 @media (max-width: 700px) {
-  .workspace-preferences { flex-direction: column; align-items: flex-start; gap: 8px; margin: -8px 0 16px; }
+  .workspace-preferences { flex-direction: column; align-items: flex-start; gap: 8px; margin: 0; }
   .save-drafts-control { font-size: 10px; }
   .panel-title { column-gap: 7px; }
   .document-stats { font-size: 9px; padding-left: 19px; gap: 4px; }

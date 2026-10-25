@@ -45,9 +45,17 @@ test('shows inherited facts and notation, edits prose locally, and keeps undo th
   const words = await page.getByLabel('Edited word count and reading time').textContent();
   await page.getByRole('group', { name: 'Edited view' }).getByRole('button', { name: 'Edit', exact: true }).click();
   await expect(result).toHaveAttribute('contenteditable', 'true');
+  await expect(page.locator('.result-panel .added').first()).toBeVisible();
+  await expect(page.locator('.draft-panel .removed').first()).toBeVisible();
   await selectText(page, 'A final paragraph');
   await page.keyboard.type('An expanded closing paragraph');
   await expect(result).toContainText('An expanded closing paragraph');
+  await expect(page.locator('.result-panel .added').filter({ hasText: 'expanded' })).toBeVisible();
+  await page.getByLabel('Show changes', { exact: true }).uncheck();
+  await expect(page.locator('.result-panel .added')).toHaveCount(0);
+  await expect(factMark).toHaveText('client');
+  await page.getByLabel('Show changes', { exact: true }).check();
+  await expect(page.locator('.result-panel .added').filter({ hasText: 'expanded' })).toBeVisible();
   await expect(page.getByLabel('Edited word count and reading time')).not.toHaveText(words!);
   await expect(page.getByRole('textbox', { name: 'Original draft' })).toContainText('A final paragraph');
   await expect(factMark).toHaveText('client');
@@ -70,6 +78,33 @@ test('shows inherited facts and notation, edits prose locally, and keeps undo th
   await page.screenshot({ path: info.outputPath('inline-light.png'), fullPage: true, animations: 'disabled' });
   await page.getByRole('button', { name: 'Toggle theme' }).click();
   await page.screenshot({ path: info.outputPath('inline-dark.png'), fullPage: true, animations: 'disabled' });
+});
+
+test('a long rewrite stays highlighted in Edit, including while typing and after undo', async ({ page }, info) => {
+  const original = Array.from({ length: 100 }, (_, i) => `A concrete trace of client ${i} explains how the local connection limit differs from translated source port allocation. It gives engineers a useful way to investigate failures without conflating their causes.`).join('\n\n');
+  const edited = Array.from({ length: 100 }, (_, i) => `Tracing request ${i} makes the distinction clear: the operating system allocates one endpoint, and the gateway allocates another. Follow each allocation to understand why the connection failed and choose the right fix.`).join('\n\n');
+  await page.addInitScript(({ source, output }) => {
+    localStorage.setItem('edittrace.v1.settings', JSON.stringify({ saveDrafts: true, connectionEnabled: false, locks: { structure: false, inline: false, numbers: false, signature: false } }));
+    localStorage.setItem('edittrace.v1.draft', JSON.stringify({ source, output, outputLocks: [], manual: [], format: 'text', name: 'Long rewrite.txt' }));
+  }, { source: original, output: edited });
+  await page.goto('/');
+  const result = page.getByRole('textbox', { name: 'Edited result' });
+  const view = page.getByRole('group', { name: 'Edited view' });
+  await expect(page.locator('.result-panel .added').first()).toBeVisible();
+  await view.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(page.locator('.result-panel .added').first()).toBeVisible();
+  await result.focus(); await page.keyboard.press('Control+Home');
+  await page.keyboard.type('A local clarification. ', { delay: 15 });
+  await expect(result).toContainText('A local clarification.');
+  await expect(page.locator('.result-panel .added').first()).toContainText('local clarification.');
+  await expect(page.locator('.draft-panel .removed').first()).toBeVisible();
+  await page.keyboard.press('Control+z');
+  await expect(result).not.toContainText('A local clarification.');
+  await expect(page.locator('.result-panel .added').first()).toBeVisible();
+  await expect(page.locator('.change-navigation')).not.toContainText('refresh');
+  await page.screenshot({ path: info.outputPath('long-inline-light.png'), fullPage: true, animations: 'disabled' });
+  await page.getByRole('button', { name: 'Toggle theme' }).click();
+  await page.screenshot({ path: info.outputPath('long-inline-dark.png'), fullPage: true, animations: 'disabled' });
 });
 
 test('typing, paste, cut, and delete cannot replace protected output', async ({ page, modelServer }) => {
