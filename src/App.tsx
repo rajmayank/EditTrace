@@ -338,15 +338,14 @@ export default function App() {
     </header>
 
     <main>
-      <section className={'structure-promise' + (source ? ' is-compact' : '')} aria-label={source ? 'Privacy and draft saving' : 'Structure protection'}>
+      <section className={'structure-promise' + (source ? ' is-compact' : '')} aria-label={source ? 'Privacy' : 'Structure protection'}>
         {!source && <div className="structure-overview">
           <div className="structure-pipeline"><strong>Protect<span aria-hidden="true">→</span>Edit<span aria-hidden="true">→</span>Check</strong></div>
           <p>Formatting and locked details are protected before your model edits.</p>
-          <button className="text-button" onClick={() => togglePanel('help')}>How it works<ArrowRight size={13} /></button>
+          <button className="text-button" onClick={() => togglePanel('help')}>Explore EditTrace<ArrowRight size={13} /></button>
         </div>}
         <div className="workspace-preferences">
           <div className="privacy-note"><span><strong>No tracking. No server-side storage.</strong> Optional saves stay in your browser.</span></div>
-          <label className="check-label save-drafts-control" title="Save this draft and edit history in your browser. When off, they stay in this tab."><input type="checkbox" checked={settings.saveDrafts} onChange={e => setSettings(s => ({ ...s, saveDrafts: e.target.checked }))} />Save drafts on this device</label>
         </div>
       </section>
       <div className="document-bar">
@@ -387,7 +386,7 @@ export default function App() {
 
       <div className="edit-bar">
         <div className="edit-feedback"><div className="edit-status" role="status" aria-live="polite">{busy ? <><span className="spinner" />{retrying !== null ? progress?.retry ? 'Checking passage locks again' : 'Retrying passage' : progress?.retry ? 'Checking locks again' : 'Editing'}{retrying === null && <span className="muted">{progress?.done ?? 0}/{progress?.total ?? '…'} passages</span>}</> : status ? <span>{status}</span> : <><LockKeyhole size={15} /><span>Select text to keep it word for word.</span></>}</div>{stats && <OutputRate stats={stats} active={busy} />}</div>
-        <div className="edit-actions">{focus.active && <button className="focus-exit text-button" aria-label="Exit focus mode" onClick={focus.exit} title="Exit focus mode (Esc)"><Minimize2 size={16} /><span>Exit focus</span><kbd>Esc</kbd></button>}<button id="run-edit" className={'primary-button ' + (busy ? 'stop-button' : '')} disabled={!busy && !source.trim()} onClick={() => void run()}>{busy ? <Square size={14} fill="currentColor" strokeWidth={0} /> : <Play size={15} fill="currentColor" />}{busy ? 'Stop' : 'Edit draft'}{!busy && <kbd>{shortcut} ↵</kbd>}</button></div>
+        <div className="edit-actions">{focus.active && <button className="focus-exit text-button" aria-label="Exit focus mode" onClick={focus.exit} title="Exit focus mode (Esc)"><Minimize2 size={16} /><span>Exit focus</span><kbd>Esc</kbd></button>}<label className="check-label save-drafts-control" title="Save this draft and edit history in your browser. When off, they stay in this tab."><input type="checkbox" checked={settings.saveDrafts} onChange={e => setSettings(s => ({ ...s, saveDrafts: e.target.checked }))} /><span>Save drafts on this device</span></label><button id="run-edit" className={'primary-button ' + (busy ? 'stop-button' : '')} disabled={!busy && !source.trim()} onClick={() => void run()}>{busy ? <Square size={14} fill="currentColor" strokeWidth={0} /> : <Play size={15} fill="currentColor" />}{busy ? 'Stop' : 'Edit draft'}{!busy && <kbd>{shortcut} ↵</kbd>}</button></div>
       </div>
       {hasResult && !busy && <div className="review-bar"><label className="check-label"><input type="checkbox" checked={showDiff} onChange={e => setShowDiff(e.target.checked)} />Show changes</label><div className="change-navigation"><span>{diff.before.length} removals · {diff.after.length} additions</span><button aria-label="Previous change" disabled={!diff.before.length} onClick={() => navigateChange(-1)}><ChevronLeft size={15} /></button><button aria-label="Next change" disabled={!diff.before.length} onClick={() => navigateChange(1)}><ChevronRight size={15} /></button></div></div>}
       <footer className="app-footer"><span className="attribution">Built and maintained by <a href="https://mayankraj.com" target="_blank" rel="noreferrer">Mayank Raj</a></span><div className="footer-links"><a href="https://github.com/rajmayank/EditTrace" target="_blank" rel="noreferrer">GitHub repo<ArrowUpRight size={11} /></a><span>Apache 2.0</span></div></footer>

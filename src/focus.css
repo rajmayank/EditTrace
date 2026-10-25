@@ -4,6 +4,7 @@
 .pane-collapse { min-width: 28px; padding: 5px; }
 .collapsed-handle { display: none; }
 .edit-actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.edit-actions .save-drafts-control { margin-right: 6px; }
 .focus-exit kbd { font: 9px ui-monospace, monospace; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 2px 4px; }
 
 @media (min-width: 701px) {
@@ -57,13 +58,18 @@ html.editor-focus { overflow: hidden; }
 @media (max-width: 700px) {
   .pane-collapse { display: none; }
   .panel-actions { gap: 0; }
+  .edit-bar { flex-wrap: wrap; row-gap: 8px; }
+  .edit-bar .edit-feedback { flex-basis: 100%; max-width: none; }
+  .edit-actions { width: 100%; justify-content: flex-end; }
+  .edit-actions .save-drafts-control { min-width: 0; margin-right: 0; white-space: normal; }
+  .save-drafts-control span { min-width: 0; }
   .focus-mode main { padding: 6px 8px 0; }
   .focus-mode .mobile-panes { flex-shrink: 0; margin-bottom: 6px; padding: 3px; }
   .focus-mode .mobile-panes button { min-height: 30px; }
   .focus-mode .edit-bar { align-items: flex-start; gap: 7px; padding: 8px 0; }
   .focus-mode .edit-actions { gap: 5px; }
-  .focus-mode .focus-exit { min-width: 30px; padding: 5px; }
+  .focus-mode .focus-exit { min-width: 30px; padding: 5px; margin-right: auto; }
   .focus-mode .focus-exit span, .focus-mode .focus-exit kbd { display: none; }
-  .focus-mode .edit-feedback { max-width: 55%; }
+  .focus-mode .edit-feedback { max-width: none; }
   .focus-mode .primary-button { padding: 8px 10px; }
 }

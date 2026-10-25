@@ -9,8 +9,12 @@ for (const width of [320, 1440]) {
     await expect(footer).not.toContainText('MayankRaj.com');
     await expect(footer.getByRole('link', { name: 'GitHub repo' })).toHaveAttribute('href', 'https://github.com/rajmayank/EditTrace');
     await expect(footer.getByRole('checkbox')).toHaveCount(0);
-    const save = page.locator('.workspace-preferences').getByLabel('Save drafts on this device');
-    await expect(save).toBeVisible(); await save.check();
+    const save = page.locator('.edit-actions').getByLabel('Save drafts on this device');
+    await expect(save).toBeVisible();
+    const saveBox = await save.boundingBox(), runBox = await page.getByRole('button', { name: 'Edit draft' }).boundingBox();
+    expect(saveBox!.x + saveBox!.width).toBeLessThanOrEqual(runBox!.x);
+    await expect(page.getByRole('button', { name: 'Explore EditTrace' })).toBeVisible();
+    await save.check();
     await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('edittrace.v1.settings')!).saveDrafts)).toBe(true);
     await save.uncheck();
     await page.getByRole('button', { name: 'Try a sample' }).click();
