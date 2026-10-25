@@ -13,13 +13,19 @@ function errorText(status: number) {
   return `Server returned ${status}. Check the model server logs and context limit.`;
 }
 export const networkHelp = 'Could not reach the server. Check its address, CORS, and browser local-network permission. Remote servers need HTTPS from GitHub Pages.';
+export function connectionError(error: unknown) {
+  const known = error instanceof Error || error instanceof DOMException;
+  if (known && (error.name === 'TimeoutError' || /timed? ?out/i.test(error.message))) return 'Connection timed out. Check that the server is running and reachable.';
+  if (error instanceof TypeError && /fetch|network|load failed/i.test(error.message)) return networkHelp;
+  return known ? error.message : 'Connection failed. Check the server address.';
+}
 
 export async function listModels(c: Connection, signal?: AbortSignal): Promise<string[]> {
   const response = await fetch(baseURL(c.url) + '/models', { headers: headers(c.key), signal: AbortSignal.any([AbortSignal.timeout(12000), ...(signal ? [signal] : [])]) });
   if (!response.ok) throw new Error(errorText(response.status));
   const data = await response.json();
-  if (!Array.isArray(data.data)) throw new Error('This server did not return a model list. Use an OpenAI-compatible endpoint.');
-  const ids = data.data.map((m: { id?: unknown }) => m.id).filter((id: unknown): id is string => typeof id === 'string');
+  if (!data || !Array.isArray(data.data)) throw new Error('This server did not return a model list. Use an OpenAI-compatible endpoint.');
+  const ids = [...new Set<string>(data.data.map((m: { id?: unknown } | null) => m?.id).filter((id: unknown): id is string => typeof id === 'string'))];
   if (!ids.length) throw new Error('No models available. Load a model in your server first.');
   return ids;
 }

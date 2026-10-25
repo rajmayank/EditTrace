@@ -2,14 +2,14 @@
 
 EditTrace is a browser editor that connects to your own model server. Paste a draft, protect the details that must survive, and review every change before using the result.
 
-The original stays on the left. The edit streams on the right. Removed words are struck through in red; additions are highlighted in green. Markdown has a source view and a lightweight reading preview.
+The original stays on the left. The right starts empty and fills as tokens arrive, one passage at a time. Removed words are struck through in red; additions are highlighted in green. Markdown has a source view and a lightweight reading preview.
 
 [Open EditTrace](https://rajmayank.github.io/EditTrace/)
 
 ## Use it
 
 1. Start LM Studio's local server, or an OpenAI-compatible server you control. Enable CORS for the editor's origin.
-2. Open **Connect a model**, enter the base URL, and select **Test connection**. The local default is `http://localhost:1234/v1`. Choose the model to use by default.
+2. Open **Connect a model**, choose a provider preset or enter a base URL, and select **Test connection**. The status appears directly below the button. Choose a default model from the discovered list, or enter its ID manually.
 3. Paste a draft or import a `.md` or `.txt` file. Choose a preset, adjust the instructions if needed, and select **Edit draft**.
 4. Review the changes, then copy or export the result. `⌘ Enter` or `Ctrl Enter` starts an edit; the same shortcut stops a running edit.
 
@@ -30,7 +30,20 @@ Detection is based on recognizable syntax, not a complete understanding of every
 
 ## Connection and storage
 
-The browser sends requests directly to the server you choose. There is no application relay, account, analytics, or bundled model. A remote server receives the editable passages you submit. Protected text is masked before submission.
+The browser sends requests directly to the provider you choose. EditTrace has no background service, server-side draft storage, account, or analytics. Your provider receives the editable passages you submit and any key needed to authenticate. Protected text is masked before submission. The provider's own storage policy still applies.
+
+The presets use these documented OpenAI-compatible endpoints. Each server must allow browser requests from EditTrace's origin.
+
+| Preset | Default base URL | Setup |
+| --- | --- | --- |
+| LM Studio (Local) | `http://localhost:1234/v1` | Start the server and enable CORS. [Docs](https://lmstudio.ai/docs/developer/openai-compat) |
+| Ollama | `http://localhost:11434/v1` | Set `OLLAMA_ORIGINS` for the editor's origin and restart. [Docs](https://docs.ollama.com/api/openai-compatibility) |
+| llama.cpp | `http://localhost:8080/v1` | Run `llama-server` and allow the editor's origin. [Docs](https://github.com/ggml-org/llama.cpp/tree/master/tools/server) |
+| vLLM | `http://localhost:8000/v1` | Use a chat-capable model and your server's address. [Docs](https://docs.vllm.ai/en/latest/serving/online_serving/) |
+| OpenRouter | `https://openrouter.ai/api/v1` | Supply an API key and choose a text model. [Docs](https://openrouter.ai/docs/quickstart) |
+| External | Your base URL | Use an endpoint with `/models` discovery and streamed `/chat/completions`. |
+
+Saved configurations are checked again after refresh. A successful stream also updates the connection badge. **Disconnect** clears the selected model and API key, removes any remembered key, and stops automatic reconnection. Switching provider presets clears the previous provider's key.
 
 Connection settings and the current instructions are saved in browser storage. API keys stay in memory unless **Remember API key on this device** is enabled. Saving a key uses browser local storage, not an encrypted vault.
 
@@ -66,7 +79,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-The suite uses a local simulated model server. It exercises streaming, selection locks, signature-preserving exports, mobile panel switching, light and dark themes, and reduced motion. Screenshots are saved in `test-results/`. CI keeps the browser report and screenshots for seven days.
+The suite uses a local simulated model server. It exercises incremental streaming, connection results, refresh and disconnect, selection locks, signature-preserving exports, tall screens, mobile panels, both themes, and reduced motion. Provider defaults follow the linked documentation; the suite does not make live requests to those providers. Screenshots are saved in `test-results/`. CI keeps the browser report and screenshots for seven days.
 
 ## Deploy and contribute
 
