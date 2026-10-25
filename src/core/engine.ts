@@ -1,8 +1,9 @@
 import { complete } from './api';
 import { planDocument } from './plan';
-import { protect, restore, streamText } from './protection';
+import { protect, restore, restoredStream } from './protection';
+import { clipOutputLocks, joinOutputLocks, originalOutputLocks, resolveOutputLocks } from './output';
 import { GenerationMeter, type GenerationStats } from './metrics';
-import type { Connection, Issue, Lock } from './types';
+import type { Connection, Issue, Lock, OutputLock } from './types';
 
 const PROTOCOL = `You are editing one passage from a document. Return only its edited text.
 Preserve the argument, factual certainty, technical names, and paragraph structure.
@@ -12,8 +13,8 @@ Do not change marker spelling, insert other markers, wrap the result in a code b
 or add explanations. Protected line breaks must stay as markers. Do not add new line breaks.
 Preserve leading and trailing spaces when the passage continues a sentence.`;
 
-export type Progress = { text: string; preview: string; streamed: boolean; issues: Issue[]; done: number; total: number; retry: boolean; stats: GenerationStats };
-export type PassageProgress = Pick<Progress, 'text' | 'issues' | 'streamed' | 'retry' | 'stats'>;
+export type Progress = { text: string; preview: string; outputLocks: OutputLock[]; streamed: boolean; issues: Issue[]; done: number; total: number; retry: boolean; stats: GenerationStats };
+export type PassageProgress = Pick<Progress, 'text' | 'outputLocks' | 'issues' | 'streamed' | 'retry' | 'stats'>;
 export class PassageStateError extends Error {}
 
 /** Retry one retained unit, preserving every other accepted edit and source offset. */
@@ -21,6 +22,7 @@ export async function retryPassage(
   source: string, output: string, locks: Lock[], issues: Issue[], target: Issue,
   connection: Connection, instructions: string, signal: AbortSignal,
   onProgress: (progress: PassageProgress) => void, generate: typeof complete = complete,
+  savedOutputLocks?: OutputLock[],
 ): Promise<PassageProgress> {
   const index = issues.findIndex(issue => issue.from === target.from && issue.to === target.to && issue.outputFrom === target.outputFrom && issue.outputTo === target.outputTo);
   const validRange = (from: number, to: number, length: number) => Number.isSafeInteger(from) && Number.isSafeInteger(to) && from >= 0 && to > from && to <= length;
@@ -33,11 +35,17 @@ export async function retryPassage(
   const editable = planDocument(original, localLocks).filter(unit => unit.editable);
   if (editable.length !== 1) throw new PassageStateError('This passage cannot be retried separately. Run a fresh edit with the current locks.');
   const prefix = output.slice(0, target.outputFrom), suffix = output.slice(target.outputTo);
+  const previousLocks = resolveOutputLocks(source, output, locks, savedOutputLocks).locks;
   // Source positions stay fixed; later output positions move with the replacement length.
-  const patch = (text: string, keep: boolean, message = target.message): Pick<PassageProgress, 'text' | 'issues'> => {
+  const patch = (text: string, local: OutputLock[], keep: boolean, message = target.message): Pick<PassageProgress, 'text' | 'outputLocks' | 'issues'> => {
     const delta = text.length - original.length;
     return {
       text: prefix + text + suffix,
+      outputLocks: joinOutputLocks([
+        ...clipOutputLocks(previousLocks, 0, target.outputFrom),
+        ...local.map(lock => ({ ...lock, from: target.outputFrom + lock.from, to: target.outputFrom + lock.to, sourceFrom: target.from + lock.sourceFrom, sourceTo: target.from + lock.sourceTo })),
+        ...clipOutputLocks(previousLocks, target.outputTo, output.length, delta),
+      ]),
       issues: issues.flatMap((issue, i) => i === index ? keep ? [{ ...issue, outputTo: issue.outputFrom + text.length, message }] : [] : [{ ...issue, outputFrom: issue.outputFrom + (i > index ? delta : 0), outputTo: issue.outputTo + (i > index ? delta : 0) }]),
     };
   };
@@ -47,11 +55,13 @@ export async function retryPassage(
     const result = await editDocument(original, localLocks, connection, instructions, signal, progress => {
       streamed = progress.streamed;
       stats = progress.stats;
-      onProgress({ ...patch(progress.preview || original, true), streamed, retry: progress.retry, stats });
+      const preview = progress.preview || original;
+      const local = progress.preview ? clipOutputLocks(progress.outputLocks, 0, preview.length) : originalOutputLocks(localLocks);
+      onProgress({ ...patch(preview, local, true), streamed, retry: progress.retry, stats });
     }, generate);
-    return { ...patch(result.text, !!result.issues.length, result.issues[0]?.message), streamed: result.streamed, retry: false, stats: result.stats };
+    return { ...patch(result.text, result.outputLocks, !!result.issues.length, result.issues[0]?.message), streamed: result.streamed, retry: false, stats: result.stats };
   } catch (error) {
-    onProgress({ text: output, issues, streamed, retry: false, stats });
+    onProgress({ text: output, outputLocks: previousLocks, issues, streamed, retry: false, stats });
     throw error;
   }
 }
@@ -63,11 +73,21 @@ export async function editDocument(
 ): Promise<Progress> {
   const plan = planDocument(source, locks);
   const parts = plan.map(p => p.source), issues: Issue[] = [];
+  const partLocks = plan.map(unit => originalOutputLocks(unit.locks, unit.from));
   const total = plan.filter(p => p.editable).length;
   const meter = new GenerationMeter();
   let done = 0, preview = '', receivedText = false;
   const prefix = (end: number) => parts.slice(0, end).join('');
-  const emit = (retry = false) => onProgress({ text: parts.join(''), preview, streamed: receivedText, issues: [...issues], done, total, retry, stats: meter.snapshot() });
+  const outputLocks = () => {
+    let offset = 0;
+    return joinOutputLocks(partLocks.flatMap((ranges, i) => {
+      const shifted = ranges.map(lock => ({ ...lock, from: offset + lock.from, to: offset + lock.to }));
+      offset += parts[i].length;
+      return shifted;
+    }));
+  };
+  const emit = (retry = false) => onProgress({ text: parts.join(''), preview, outputLocks: outputLocks(), streamed: receivedText, issues: [...issues], done, total, retry, stats: meter.snapshot() });
+  const reset = (i: number) => { parts[i] = plan[i].source; partLocks[i] = originalOutputLocks(plan[i].locks, plan[i].from); };
   emit();
   for (let i = 0; i < plan.length; i++) {
     signal.throwIfAborted();
@@ -76,7 +96,7 @@ export async function editDocument(
     const p = protect(unit.source, unit.locks);
     let accepted = false, reason = 'Protected text changed.';
     for (let attempt = 0; attempt < 2; attempt++) {
-      signal.throwIfAborted(); parts[i] = unit.source;
+      signal.throwIfAborted(); reset(i);
       meter.beginAttempt();
       preview = receivedText ? prefix(i) : '';
       emit(attempt > 0);
@@ -84,7 +104,10 @@ export async function editDocument(
         const result = await generate(connection, instructions + '\n\n' + PROTOCOL, p.text, signal, text => {
           meter.observe(text);
           if (text) receivedText = true;
-          parts[i] = streamText(text, p); preview = receivedText ? prefix(i + 1) : ''; emit(attempt > 0);
+          const restored = restoredStream(text, p);
+          parts[i] = restored.text;
+          partLocks[i] = restored.locks.map(lock => ({ ...lock, sourceFrom: unit.from + lock.sourceFrom, sourceTo: unit.from + lock.sourceTo }));
+          preview = receivedText ? prefix(i + 1) : ''; emit(attempt > 0);
         });
         meter.observe(result);
         const restored = restore(result, p);
@@ -97,24 +120,28 @@ export async function editDocument(
         else {
           const leading = unit.source.match(/^\s*/)?.[0] ?? '';
           const trailing = unit.source.match(/\s*$/)?.[0] ?? '';
-          parts[i] = leading + restored.trim() + trailing;
+          const text = leading + restored.trim() + trailing;
+          const shift = leading.length - (restored.length - restored.trimStart().length);
+          const projected = restoredStream(result, p).locks.map(lock => ({ ...lock, from: lock.from + shift, to: lock.to + shift, sourceFrom: unit.from + lock.sourceFrom, sourceTo: unit.from + lock.sourceTo }));
+          if (projected.some(lock => lock.from < 0 || lock.to > text.length || text.slice(lock.from, lock.to) !== source.slice(lock.sourceFrom, lock.sourceTo))) { reason = 'Protected whitespace changed.'; continue; }
+          parts[i] = text; partLocks[i] = projected;
           accepted = true; break;
         }
       } catch (error) {
-        if (signal.aborted) { parts[i] = unit.source; preview = receivedText ? prefix(i + 1) : ''; emit(); throw error; }
+        if (signal.aborted) { reset(i); preview = receivedText ? prefix(i + 1) : ''; emit(); throw error; }
         reason = error instanceof TypeError ? 'Could not reach the model server.' : error instanceof Error ? error.message : 'Generation failed.';
         // Connection/auth failures affect the entire run; do not submit every remaining passage.
         if (error instanceof TypeError || /Authentication|Endpoint or model|Server returned/.test(reason)) {
-          parts[i] = unit.source; preview = receivedText ? prefix(i + 1) : ''; emit(); throw error;
+          reset(i); preview = receivedText ? prefix(i + 1) : ''; emit(); throw error;
         }
       }
     }
     if (!accepted) {
-      parts[i] = unit.source;
+      reset(i);
       const outputFrom = prefix(i).length;
       issues.push({ from: unit.from, to: unit.to, outputFrom, outputTo: outputFrom + unit.source.length, message: reason + ' Original kept.' });
     }
     done++; preview = prefix(i + 1); emit();
   }
-  return { text: parts.join(''), preview: parts.join(''), streamed: receivedText, issues, done, total, retry: false, stats: meter.snapshot() };
+  return { text: parts.join(''), preview: parts.join(''), outputLocks: outputLocks(), streamed: receivedText, issues, done, total, retry: false, stats: meter.snapshot() };
 }

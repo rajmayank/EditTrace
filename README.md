@@ -20,6 +20,7 @@ Protection and validation run in [the browser's editing code](src/core/engine.ts
 
 - **Protect what matters.** Select your own facts or use automatic rules for Markdown structure, signatures, and numbers. The locked text stays word for word.
 - **See what changed.** The original stays on the left; the right starts empty and fills as tokens arrive. Removals are red and struck through, additions are green, and protected text is blue.
+- **Refine the result inline.** Choose **Edit** in the right pane after generation. Change the prose while inherited protections stay locked. The diff, counts, copy, export, and saved draft follow your local edits; the original stays unchanged.
 - **Choose the editing pass.** Start with Technical article, Markdown edit, Email polish, or Light copyedit. Change the system prompt when you need different instructions.
 - **Review at your own pace.** Switch between source, diff, and sanitized Markdown preview. Link scrolling to keep corresponding blocks in view, or scroll each pane independently. Retry individual retained passages, copy or export the result, and use an edit as the next draft.
 - **Keep the workspace comfortable.** Light and dark themes, responsive panels, keyboard controls, and reduced-motion support work alongside live word counts, reading estimates, and output speed.
@@ -55,6 +56,10 @@ Remote servers need HTTPS when used from GitHub Pages and must allow the editor'
 ## Protection and recovery
 
 Select text in **Source**, then choose **Lock as fact** beside the selection or **Lock selection** in the toolbar. This works across document types. Editing inside a fact in the source removes its manual lock.
+
+Protected ranges carry into **Changes** and **Edit** on the right, including manually locked facts. Their positions are tracked as model markers are restored, so repeated words don't move a fact lock to another occurrence. In Edit mode, typing, deleting, cutting, or pasting through protected text is blocked. You can still select and copy it. Change or unlock the original when that detail needs to change.
+
+Local edits support undo and redo across the result views and appear in edit history. Editing inside a retained passage clears its review flag; other retained passages keep their positions and remain retryable. Older saved results recover protections only when their placement is unambiguous. Otherwise, run a fresh edit before editing inline.
 
 **Protected passages** explains each automatic rule and lets you turn it off. Markdown protects recognized code blocks, tables, front matter, links, and formatting markers. Numbers, dates, and percentages are protected by default. Email mode detects common signatures and quoted threads; select unusual signatures manually.
 

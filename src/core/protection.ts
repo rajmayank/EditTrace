@@ -97,7 +97,7 @@ export function autoLocks(text: string, format: Format, opts: LockOptions, manua
   return mergeLocks(ranges.map(r => ({ ...r, from: Math.max(0, r.from), to: Math.min(text.length, r.to) })));
 }
 
-export type ProtectedText = { text: string; tokens: { marker: string; original: string }[]; namespace: string };
+export type ProtectedText = { text: string; tokens: { marker: string; original: string; from: number; to: number; kind: string }[]; namespace: string };
 export function protect(text: string, ranges: Lock[], namespace = crypto.randomUUID().replaceAll('-', '').slice(0, 12)): ProtectedText {
   while (text.includes('[[ET_' + namespace)) namespace += 'x';
   const tokens: ProtectedText['tokens'] = [];
@@ -105,7 +105,7 @@ export function protect(text: string, ranges: Lock[], namespace = crypto.randomU
   for (const r of mergeLocks(ranges)) {
     const marker = `[[ET_${namespace}_${tokens.length}]]`;
     result += text.slice(cursor, r.from) + marker;
-    tokens.push({ marker, original: text.slice(r.from, r.to) }); cursor = r.to;
+    tokens.push({ marker, original: text.slice(r.from, r.to), from: r.from, to: r.to, kind: r.kind }); cursor = r.to;
   }
   return { text: result + text.slice(cursor), tokens, namespace };
 }
@@ -127,10 +127,23 @@ export function restore(output: string, p: ProtectedText): string | null {
 
 /** Provisional stream only; final text always goes through restore() and validation. */
 export function streamText(output: string, p: ProtectedText): string {
-  let result = output;
-  for (const t of p.tokens) result = result.split(t.marker).join(t.original);
-  // Hide full or partially emitted placeholders until they can be restored.
-  result = result.replace(/\[\[ET_[^\]]*(?:\]\]?)?/g, '');
-  for (let n = 4; n >= 1; n--) if (result.endsWith('[[ET_'.slice(0, n))) return result.slice(0, -n);
-  return result;
+  return restoredStream(output, p).text;
+}
+
+export function restoredStream(output: string, p: ProtectedText) {
+  const tokens = new Map(p.tokens.map(token => [token.marker, token]));
+  const locks: (Lock & { sourceFrom: number; sourceTo: number })[] = [];
+  let text = '', cursor = 0;
+  for (const match of output.matchAll(/\[\[ET_[^\]]*(?:\]\]?)?/g)) {
+    text += output.slice(cursor, match.index);
+    const token = tokens.get(match[0]);
+    if (token) {
+      locks.push({ from: text.length, to: text.length + token.original.length, kind: token.kind, sourceFrom: token.from, sourceTo: token.to });
+      text += token.original;
+    }
+    cursor = match.index + match[0].length;
+  }
+  let tail = output.slice(cursor);
+  for (let n = 4; n >= 1; n--) if (tail.endsWith('[[ET_'.slice(0, n))) { tail = tail.slice(0, -n); break; }
+  return { text: text + tail, locks };
 }
