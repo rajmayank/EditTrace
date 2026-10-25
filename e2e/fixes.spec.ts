@@ -12,7 +12,7 @@ for (const size of [{ width: 1440, height: 2200 }, { width: 1920, height: 2600 }
     await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(17, 19, 24)');
     await expect(page.getByText('0.1', { exact: true })).toHaveCount(0);
     await expect(page.getByText('No tracking. No server-side storage.')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Mayank Raj MayankRaj.com' })).toHaveAttribute('href', 'https://mayankraj.com');
+    await expect(page.getByRole('link', { name: 'Mayank Raj', exact: true })).toHaveAttribute('href', 'https://mayankraj.com');
     await page.screenshot({ path: info.outputPath('tall-dark.png'), fullPage: true, animations: 'disabled' });
   });
 }

@@ -1,5 +1,6 @@
 import type { Connection, Format, Span, LockOptions, Issue } from './types';
-export type Draft = { source: string; output: string; manual: Span[]; format: Format; name: string; issues?: Issue[] };
+import type { GenerationStats } from './metrics';
+export type Draft = { source: string; output: string; manual: Span[]; format: Format; name: string; issues?: Issue[]; stats?: GenerationStats };
 export type SavedSettings = { connection: Connection; connectionEnabled?: boolean; provider?: string; rememberKey: boolean; saveDrafts: boolean; theme: string; preset: string; prompt: string; locks: LockOptions };
 export const PREFIX = 'edittrace.v1.';
 export function read<T>(key: string, fallback: T): T {

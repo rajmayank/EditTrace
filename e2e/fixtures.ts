@@ -58,6 +58,11 @@ export const test = base.extend<{ resetModel: void }, { modelServer: ModelServer
   }, { scope: 'worker' }],
 });
 export { expect };
+export async function openRetained(page: Page) {
+  const details = page.locator('.retained-review details');
+  await expect(details).toBeVisible();
+  if (!await details.evaluate(el => (el as HTMLDetailsElement).open)) await details.locator('summary').click();
+}
 export async function connect(page: Page, url: string, model?: string) {
   await page.getByRole('button', { name: /Connect a model/ }).click();
   await page.getByRole('textbox', { name: 'Server URL' }).fill(url);

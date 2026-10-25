@@ -15,6 +15,10 @@ The original stays on the left. The right starts empty and fills as tokens arriv
 
 Use a text model that follows system instructions and copies protected markers accurately. A non-reasoning model is usually a better fit for short editing passes. Model quality still matters outside protected passages.
 
+Word counts and reading estimates update while you type and while output streams. [reading-time](https://github.com/ngryman/reading-time) counts the readable content extracted by Marked. Markdown notation, hidden link destinations, front matter, and comments do not inflate the estimate. Prose uses 200 words per minute; code uses 100. Images add 12 seconds for the first, one second less for each following image, down to three seconds per image. Images are never fetched. Reading speed varies with the reader and content.
+
+The output speed beside the edit controls is measured in the browser: generated words received divided by elapsed time, including server wait and retries. Protected text restored locally does not count. The figures update during generation and freeze when it ends or stops. A passage retry starts a new measurement.
+
 ## Keep the details
 
 - **Lock your own facts.** Select text in Source and choose **Lock as fact** beside the selection, or use **Lock selection** in the toolbar. This works in Markdown, email, and plain text. Blue highlighting shows what is protected. Editing that source text manually removes its fact lock.
@@ -25,6 +29,8 @@ Use a text model that follows system instructions and copies protected markers a
 Paragraph separators stay outside generation. Editable passages are processed separately, with long passages split at safe boundaries. Protected ranges become unique markers. Every marker must return exactly once and in the original order before the original text is restored.
 
 A failed passage gets one retry. If it still fails, EditTrace retains that original passage. The bottom of the Edited panel lists its excerpt and the reason. **Show passage** scrolls to and highlights the exact retained text, including after earlier edits change its position. Stopping an edit keeps completed passages and restores any unfinished passage. Copy and export stay disabled during generation.
+
+The retained-passage summary starts collapsed. Open it to review or retry passages in a height-limited, scrollable list.
 
 Choose **Retry** beside a retained passage to submit just that original passage with the current model, instructions, and locks. Its replacement streams into the existing result. Other edits stay intact. A successful retry removes the flag; a failed or stopped retry keeps the previous result and its flag. Review flags are included when drafts or history are saved locally.
 
@@ -49,7 +55,7 @@ Saved configurations are checked again after refresh. A successful stream also u
 
 Connection settings and the current instructions are saved in browser storage. API keys stay in memory unless **Remember API key on this device** is enabled. Saving a key uses browser local storage, not an encrypted vault.
 
-Drafts and the last 12 edits stay in the tab by default. **Save drafts on this device** opts into browser storage. Turning it off removes saved drafts and history. Clearing browser storage removes saved settings too. The Markdown preview is sanitized and does not load external images.
+Drafts and the last 12 edits stay in the tab by default. **Save drafts on this device**, above the editor, opts into browser storage, including review flags and completed output-speed measurements. Turning it off removes saved drafts and history. Clearing browser storage removes saved settings too. The Markdown preview is sanitized and does not load external images.
 
 **Feedback** opens a new GitHub issue in another tab. The link does not include draft text, credentials, or connection settings.
 

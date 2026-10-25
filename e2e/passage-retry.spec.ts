@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
-import { test, expect, connect } from './fixtures';
+import { test, expect, connect, openRetained } from './fixtures';
 
 const source = 'A concrete trace explains the approved introduction.\n\nMUST_RETAIN_A keeps an exact allocation limit of 42 ports.\n\nMUST_RETAIN_B keeps a separate allocation limit of 64 ports.\n\nThe final approved paragraph stays useful.\n';
 const originalResult = source.replace('A concrete trace', 'A specific trace');
@@ -10,6 +10,7 @@ async function failedEdit(page: Page, url: string) {
   await expect(page.getByRole('textbox', { name: 'Original draft' })).toContainText('MUST_RETAIN_A');
   await page.getByRole('button', { name: 'Edit draft' }).click();
   await expect(page.getByText('Edit complete. Review retained passages in Edited.')).toBeVisible();
+  await openRetained(page);
   await expect(page.getByRole('button', { name: 'Retry passage 1', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Retry passage 2', exact: true })).toBeVisible();
 }
@@ -23,6 +24,7 @@ test('retry sends one passage, preserves other edits, shifts later links, and su
   await page.getByLabel('Save drafts on this device').check();
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('edittrace.v1.draft') ?? '{}').issues?.length)).toBe(2);
   await page.reload();
+  await openRetained(page);
   await expect(page.getByRole('button', { name: 'Retry passage 1', exact: true })).toBeVisible();
   modelServer.control.repairRetained = true; modelServer.control.tokenInterval = 100;
   const count = modelServer.requests.length;
@@ -46,6 +48,7 @@ test('retry sends one passage, preserves other edits, shifts later links, and su
   await expect(page.getByRole('complementary', { name: 'Retained passages' })).toHaveCount(0);
   await page.getByRole('button', { name: 'History', exact: true }).click();
   await page.locator('.history-entry').last().click();
+  await openRetained(page);
   await expect(page.getByRole('button', { name: 'Retry passage 2', exact: true })).toBeEnabled();
   expect(await exported(page)).toBe(originalResult);
 });

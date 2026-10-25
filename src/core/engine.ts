@@ -1,6 +1,7 @@
 import { complete } from './api';
 import { planDocument } from './plan';
 import { protect, restore, streamText } from './protection';
+import { GenerationMeter, type GenerationStats } from './metrics';
 import type { Connection, Issue, Lock } from './types';
 
 const PROTOCOL = `You are editing one passage from a document. Return only its edited text.
@@ -11,8 +12,8 @@ Do not change marker spelling, insert other markers, wrap the result in a code b
 or add explanations. Protected line breaks must stay as markers. Do not add new line breaks.
 Preserve leading and trailing spaces when the passage continues a sentence.`;
 
-export type Progress = { text: string; preview: string; streamed: boolean; issues: Issue[]; done: number; total: number; retry: boolean };
-export type PassageProgress = Pick<Progress, 'text' | 'issues' | 'streamed' | 'retry'>;
+export type Progress = { text: string; preview: string; streamed: boolean; issues: Issue[]; done: number; total: number; retry: boolean; stats: GenerationStats };
+export type PassageProgress = Pick<Progress, 'text' | 'issues' | 'streamed' | 'retry' | 'stats'>;
 export class PassageStateError extends Error {}
 
 /** Retry one retained unit, preserving every other accepted edit and source offset. */
@@ -41,14 +42,16 @@ export async function retryPassage(
     };
   };
   let streamed = false;
+  let stats: GenerationStats = { words: 0, elapsedMs: 0 };
   try {
     const result = await editDocument(original, localLocks, connection, instructions, signal, progress => {
       streamed = progress.streamed;
-      onProgress({ ...patch(progress.preview || original, true), streamed, retry: progress.retry });
+      stats = progress.stats;
+      onProgress({ ...patch(progress.preview || original, true), streamed, retry: progress.retry, stats });
     }, generate);
-    return { ...patch(result.text, !!result.issues.length, result.issues[0]?.message), streamed: result.streamed, retry: false };
+    return { ...patch(result.text, !!result.issues.length, result.issues[0]?.message), streamed: result.streamed, retry: false, stats: result.stats };
   } catch (error) {
-    onProgress({ text: output, issues, streamed, retry: false });
+    onProgress({ text: output, issues, streamed, retry: false, stats });
     throw error;
   }
 }
@@ -61,9 +64,10 @@ export async function editDocument(
   const plan = planDocument(source, locks);
   const parts = plan.map(p => p.source), issues: Issue[] = [];
   const total = plan.filter(p => p.editable).length;
+  const meter = new GenerationMeter();
   let done = 0, preview = '', receivedText = false;
   const prefix = (end: number) => parts.slice(0, end).join('');
-  const emit = (retry = false) => onProgress({ text: parts.join(''), preview, streamed: receivedText, issues: [...issues], done, total, retry });
+  const emit = (retry = false) => onProgress({ text: parts.join(''), preview, streamed: receivedText, issues: [...issues], done, total, retry, stats: meter.snapshot() });
   emit();
   for (let i = 0; i < plan.length; i++) {
     signal.throwIfAborted();
@@ -73,13 +77,16 @@ export async function editDocument(
     let accepted = false, reason = 'Protected text changed.';
     for (let attempt = 0; attempt < 2; attempt++) {
       signal.throwIfAborted(); parts[i] = unit.source;
+      meter.beginAttempt();
       preview = receivedText ? prefix(i) : '';
       emit(attempt > 0);
       try {
         const result = await generate(connection, instructions + '\n\n' + PROTOCOL, p.text, signal, text => {
+          meter.observe(text);
           if (text) receivedText = true;
           parts[i] = streamText(text, p); preview = receivedText ? prefix(i + 1) : ''; emit(attempt > 0);
         });
+        meter.observe(result);
         const restored = restore(result, p);
         const unprotected = p.tokens.reduce((s, t) => s.replace(t.marker, ''), result);
         if (restored === null) reason = 'Protected text changed or moved.';
@@ -109,5 +116,5 @@ export async function editDocument(
     }
     done++; preview = prefix(i + 1); emit();
   }
-  return { text: parts.join(''), preview: parts.join(''), streamed: receivedText, issues, done, total, retry: false };
+  return { text: parts.join(''), preview: parts.join(''), streamed: receivedText, issues, done, total, retry: false, stats: meter.snapshot() };
 }
