@@ -45,8 +45,7 @@ main { width: 100%; flex: 1; display: flex; flex-direction: column; min-width: 0
 .editor-panel { height: auto; min-height: 0; }
 .brand-logo { width: 37px; height: 37px; flex-shrink: 0; transition: transform 200ms var(--ease); }
 .brand:hover .brand-logo { transform: rotate(-3deg); }
-.privacy-note { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; line-height: 1.6; margin: -9px 0 19px; }
-.privacy-note svg { color: var(--accent); }
+.privacy-note { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; line-height: 1.6; margin: 0; }
 .privacy-note strong { color: var(--text); font-weight: 550; margin-right: 4px; }
 .attribution a { color: var(--text); }
 .attribution a span { color: var(--muted); margin-left: 5px; }
@@ -158,8 +157,7 @@ dialog[open]::backdrop { animation: backdrop-enter 180ms ease-out both; }
 
 @media (max-width: 700px) {
   .brand-logo { width: 32px; height: 32px; }
-  .privacy-note { align-items: flex-start; font-size: 10px; margin: -8px 0 16px; }
-  .privacy-note svg { margin-top: 2px; }
+  .privacy-note { align-items: flex-start; font-size: 10px; margin: 0; }
   .github-link { display: none; }
   .document-bar { gap: 12px; }
   .document-title { min-width: 0; flex: 1; }
