@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { test, expect, connect } from './fixtures';
+import { test, expect, connect, openRetained } from './fixtures';
 
 async function selectWithMouse(page: Page, phrase: string) {
   const box = await page.getByRole('textbox', { name: 'Original draft' }).evaluate((root, phrase) => {
@@ -87,6 +87,7 @@ for (const width of [1440, 390]) {
     await expect(review).toContainText('Unexpected HTML was added.');
     await expect(page.locator('.issue-list')).toHaveCount(0);
     const locate = review.getByRole('button', { name: 'Show retained passage 1' });
+    await openRetained(page);
     await locate.click();
     await expect(page.locator('.result-panel .review-focus')).toContainText('MUST_RETAIN');
     await expect(page.locator('.result-panel .review-focus')).toBeInViewport();

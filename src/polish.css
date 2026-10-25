@@ -93,6 +93,10 @@ dialog::backdrop { background: #14121170; }
 .word-count { font-size: 11px; }
 .footer-actions button { font-size: 11px; }
 .edit-status { font-size: 12px; }
+.empty-draft .sample-button { min-height: 36px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--subtle); gap: 10px; line-height: 1.4; }
+.empty-draft .sample-button:hover:not(:disabled) { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.feedback-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 32px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); font-size: 12px; font-weight: 550; white-space: nowrap; }
+.feedback-button:hover { background: var(--accent-soft); color: var(--accent); text-decoration: none; }
 .workspace { animation: workspace-enter 300ms var(--ease) both; }
 .mobile-panes { display: none; }
 
@@ -161,6 +165,7 @@ dialog[open]::backdrop { animation: backdrop-enter 180ms ease-out both; }
   .document-title { min-width: 0; flex: 1; }
   .document-title input { width: 100%; min-width: 0; text-overflow: ellipsis; }
   .document-actions { flex-shrink: 0; }
+  .feedback-button { padding: 5px 8px; }
   .mobile-panes {
     display: flex;
     align-items: center;

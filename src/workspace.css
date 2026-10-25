@@ -1,0 +1,38 @@
+.workspace-preferences { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; margin: -9px 0 19px; }
+.workspace-preferences .privacy-note { margin: 0; }
+.save-drafts-control { flex-shrink: 0; white-space: nowrap; }
+.panel-title { flex-wrap: wrap; column-gap: 9px; row-gap: 4px; }
+.document-stats { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font: 10px ui-monospace, SFMono-Regular, monospace; }
+.document-stats .word-count { display: inline !important; font: inherit; margin: 0; }
+.reading-time { white-space: nowrap; }
+.edit-feedback { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.edit-feedback .edit-status { max-width: none; }
+.run-metrics { display: flex; align-items: center; gap: 6px; color: var(--muted); font: 10px ui-monospace, SFMono-Regular, monospace; line-height: 1.5; flex-wrap: wrap; }
+.run-metrics svg { color: var(--accent); }
+.footer-links { display: flex; align-items: center; gap: 19px; }
+.footer-links a { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+.footer-links a:hover { color: var(--accent); }
+.protection-helper { display: flex; align-items: flex-start; gap: 10px; padding: 12px; background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line)); border-radius: 8px; }
+.protection-helper svg { color: var(--accent); margin-top: 2px; }
+.protection-helper p { margin: 0; font-size: 12px; line-height: 1.7; }
+.rule-toggle small { font-size: 11px; }
+@media (max-width: 1050px) {
+  .document-stats { flex-basis: 100%; padding-left: 22px; flex-wrap: wrap; row-gap: 3px; }
+  .workspace-preferences { flex-wrap: wrap; }
+}
+@media (max-width: 700px) {
+  .workspace-preferences { flex-direction: column; align-items: flex-start; gap: 8px; margin: -8px 0 16px; }
+  .save-drafts-control { font-size: 10px; }
+  .panel-title { column-gap: 7px; }
+  .document-stats { font-size: 9px; padding-left: 19px; gap: 4px; }
+  .edit-feedback { max-width: 62%; }
+  .run-metrics { font-size: 9px; gap: 5px; }
+  .app-footer { justify-content: space-between; }
+  .app-footer .attribution { width: auto; text-align: left; }
+  .footer-links { gap: 12px; }
+}
+@media (max-width: 560px) { .lock-options { grid-template-columns: 1fr; } }
+@media (max-width: 420px) {
+  .app-footer { justify-content: center; gap: 7px; }
+  .app-footer .attribution { width: 100%; text-align: center; }
+}

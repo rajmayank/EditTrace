@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { test, expect, connect } from './fixtures';
+import { test, expect, connect, openRetained } from './fixtures';
 
 async function contrast(page: import('@playwright/test').Page, selector: string) {
   return page.locator(selector).first().evaluate(el => {
@@ -113,6 +113,8 @@ test('broken locks retain the original passage and show a review flag', async ({
   await page.goto('/'); await connect(page, modelServer.url, 'break-locks');
   await page.locator('input[type=file]').setInputFiles({ name: 'draft.md', mimeType: 'text/markdown', buffer: Buffer.from('This article discusses a precise limit of 42 ports per client.\n') });
   await page.getByRole('button', { name: 'Edit draft' }).click();
+  await expect(page.getByRole('complementary', { name: 'Retained passages' })).toBeVisible();
+  await openRetained(page);
   await expect(page.getByRole('button', { name: 'Show retained passage 1' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Edited result' })).toContainText('42 ports');
   await page.screenshot({ path: info.outputPath('original-retained.png'), fullPage: true, animations: 'disabled' });
