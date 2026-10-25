@@ -17,6 +17,20 @@ describe('document protection', () => {
     const covered = (text: string) => { const start = doc.indexOf(text); return locks.some(l => l.from <= start && l.to >= start + text.length); };
     for (const text of ['**', '42', '`ss -s`', '[guide](https://example.com/a_(b))', '- ']) expect(covered(text), text).toBe(true);
   });
+  it('locks heading notation and line breaks without locking the wording', () => {
+    const text = '# A closer look at connection limits\r\n\r\n## Another heading ##\n\nA setext title\n===\n';
+    const locks = autoLocks(text, 'markdown', DEFAULT_LOCKS);
+    const masked = protect(text, locks);
+    expect(masked.text).toContain('A closer look at connection limits');
+    expect(masked.text).toContain('Another heading');
+    expect(masked.text).toContain('A setext title');
+    expect(masked.text).not.toContain('#');
+    expect(masked.text).not.toContain('===');
+    expect(masked.text).not.toMatch(/[\r\n]/);
+    expect(restore(masked.text, masked)).toBe(text);
+    const manual = protect(text, autoLocks(text, 'markdown', DEFAULT_LOCKS, [{ from: 2, to: 35 }]));
+    expect(manual.text).not.toContain('A closer look at connection limits');
+  });
   it('protects email signatures through the end of the message', () => {
     const email = 'Hi Alex,\n\nPlease review the deployment plan.\n\nBest regards,\nMayank\nStaff Engineer\n';
     const p = protect(email, autoLocks(email, 'email', DEFAULT_LOCKS));

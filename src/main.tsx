@@ -4,5 +4,6 @@ import App from './App';
 import './styles.css';
 import './polish.css';
 import './connection.css';
+import './review.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);

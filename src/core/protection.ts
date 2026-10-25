@@ -14,7 +14,7 @@ export function mergeLocks(ranges: Lock[]): Lock[] {
 }
 
 export function autoLocks(text: string, format: Format, opts: LockOptions, manual: Span[] = []): Lock[] {
-  const ranges: Lock[] = manual.map(r => ({ ...r, kind: 'Manual' }));
+  const ranges: Lock[] = manual.map(r => ({ ...r, kind: 'Fact' }));
   const add = (from: number, to: number, kind: string) => { if (to > from) ranges.push({ from, to, kind }); };
   const find = (regex: RegExp, kind: string) => {
     for (const m of text.matchAll(regex)) add(m.index, m.index + m[0].length, kind);
@@ -45,9 +45,14 @@ export function autoLocks(text: string, format: Format, opts: LockOptions, manua
         }
         if (end > 0) { add(start, end, 'Front matter'); continue; }
       }
-      if (/^ {0,3}#{1,6}(?:[ \t]+|$)/.test(line)) add(start, start + lines[i][0].length, 'Heading');
+      const heading = line.match(/^ {0,3}#{1,6}(?:[ \t]+|$)/);
+      if (heading) {
+        add(start, start + heading[0].length, 'Heading marker');
+        const closing = /[ \t]+#+[ \t]*$/.exec(line);
+        if (closing && closing.index >= heading[0].length) add(start + closing.index, start + line.length, 'Heading marker');
+      }
       if (/^ {0,3}(?:=+|-+)[ \t]*$/.test(line) && i > 0 && lines[i - 1][0].trim()) {
-        add(lines[i - 1].index, start + lines[i][0].length, 'Heading');
+        add(start, start + line.length, 'Heading marker');
       }
       if (/^ {0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$/.test(line)) add(start, start + line.length, 'Rule');
       if (/^ {0,3}\[[^\]]+\]:/.test(line)) add(start, start + lines[i][0].length, 'Reference');

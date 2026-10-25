@@ -17,14 +17,14 @@ Use a text model that follows system instructions and copies protected markers a
 
 ## Keep the details
 
-- **Lock any selection.** Select text in Source and choose **Lock selection**. Blue highlighting shows what is protected. Editing that source text manually removes its selection lock.
-- **Keep Markdown structure.** Recognized headings, fenced code, tables, front matter, list and quote markers, emphasis notation, line breaks, inline code, and links are protected automatically. Complete inline links, including their labels, stay unchanged.
+- **Lock your own facts.** Select text in Source and choose **Lock as fact** beside the selection, or use **Lock selection** in the toolbar. This works in Markdown, email, and plain text. Blue highlighting shows what is protected. Editing that source text manually removes its fact lock.
+- **Keep Markdown structure.** Heading prefixes such as `# `, optional closing hashes, setext underlines, and line breaks are protected. The heading words remain editable unless you lock them as a fact. Recognized fenced code, tables, front matter, list and quote markers, emphasis notation, inline code, and complete links are protected automatically. Link labels stay unchanged.
 - **Keep signatures.** Email mode detects common closings and explicit signature separators, then protects the signature and quoted thread. Select unusual signatures manually.
 - **Keep numbers.** Values, dates, and percentages are protected by default. Each automatic rule can be switched off in **Protected passages**.
 
 Paragraph separators stay outside generation. Editable passages are processed separately, with long passages split at safe boundaries. Protected ranges become unique markers. Every marker must return exactly once and in the original order before the original text is restored.
 
-A failed passage gets one retry. If it still fails, EditTrace retains that original passage and flags it. Stopping an edit keeps completed passages and restores any unfinished passage. Copy and export stay disabled during generation.
+A failed passage gets one retry. If it still fails, EditTrace retains that original passage. The bottom of the Edited panel lists its excerpt and the reason. **Show passage** scrolls to and highlights the exact retained text, including after earlier edits change its position. Stopping an edit keeps completed passages and restores any unfinished passage. Copy and export stay disabled during generation.
 
 Detection is based on recognizable syntax, not a complete understanding of every Markdown extension or email format. Check the blue ranges before editing. Locks preserve literal text; they do not verify the meaning of the surrounding rewrite. The model sees each editable passage without the rest of the article.
 
@@ -79,7 +79,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-The suite uses a local simulated model server. It exercises incremental streaming, connection results, refresh and disconnect, selection locks, signature-preserving exports, tall screens, mobile panels, both themes, and reduced motion. Provider defaults follow the linked documentation; the suite does not make live requests to those providers. Screenshots are saved in `test-results/`. CI keeps the browser report and screenshots for seven days.
+The suite uses a local simulated model server. It exercises incremental streaming, connection results, refresh and disconnect, mouse and keyboard fact locks, editable headings, retained-passage navigation, signature-preserving exports, tall screens, mobile panels, both themes, and reduced motion. Provider defaults follow the linked documentation; the suite does not make live requests to those providers. Screenshots are saved in `test-results/`. CI keeps the browser report and screenshots for seven days.
 
 ## Deploy and contribute
 

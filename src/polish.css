@@ -2,16 +2,17 @@
   color-scheme: light;
   color: var(--text);
   background: var(--bg);
-  --bg: #f6f6fa;
+  --bg: #f8f6f3;
   --surface: #ffffff;
-  --subtle: #f5f6fb;
-  --text: #29303c;
-  --muted: #667085;
-  --line: #e0e3ec;
-  --accent: #535fc5;
-  --accent-soft: #edf0ff;
-  --link: #276291;
-  --syntax: #59617b;
+  --subtle: #f8f5f1;
+  --text: #322d2a;
+  --muted: #756b63;
+  --line: #e7e0d8;
+  --accent: #a55231;
+  --accent-soft: #f6eae1;
+  --on-accent: #fff9f4;
+  --link: #925030;
+  --syntax: #74665e;
   --ease: cubic-bezier(.2, .7, .2, 1);
 }
 
@@ -20,13 +21,14 @@
   --bg: #111318;
   --surface: #1b1e25;
   --subtle: #232731;
-  --text: #edf0f7;
-  --muted: #a3adc0;
-  --line: #353b49;
-  --accent: #b6bfff;
-  --accent-soft: #2c314b;
-  --link: #a5d2f7;
-  --syntax: #bec5d8;
+  --text: #f2eee9;
+  --muted: #b1a99f;
+  --line: #383b42;
+  --accent: #edac86;
+  --accent-soft: #382d29;
+  --on-accent: #241b16;
+  --link: #efbd9e;
+  --syntax: #c2b4a8;
   --blue: #293d58;
   --blue-text: #bfd8f5;
   --red-bg: #55332f;
@@ -41,8 +43,8 @@ body, #root, .app-shell { min-height: 100dvh; }
 main { width: 100%; flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .workspace { flex: 1 0 420px; height: auto; min-height: 420px; max-height: none; }
 .editor-panel { height: auto; min-height: 0; }
-.brand-logo { width: 37px; height: 37px; flex-shrink: 0; transform: rotate(-5deg); transition: transform 200ms var(--ease); }
-.brand:hover .brand-logo { transform: rotate(3deg); }
+.brand-logo { width: 37px; height: 37px; flex-shrink: 0; transition: transform 200ms var(--ease); }
+.brand:hover .brand-logo { transform: rotate(-3deg); }
 .privacy-note { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; line-height: 1.6; margin: -9px 0 19px; }
 .privacy-note svg { color: var(--accent); }
 .privacy-note strong { color: var(--text); font-weight: 550; margin-right: 4px; }
@@ -67,7 +69,12 @@ button {
 }
 
 button:active:not(:disabled) { transform: translateY(1px); }
-.primary-button { border-radius: 9px; }
+.primary-button { border-radius: 9px; color: var(--on-accent); }
+input { accent-color: var(--accent); }
+.panel-number { color: var(--accent); }
+.middle-rail { color: var(--accent); }
+.attribution a:hover { color: var(--accent); }
+dialog::backdrop { background: #14121170; }
 .primary-button:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 20%, transparent);
