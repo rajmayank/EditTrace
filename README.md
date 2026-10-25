@@ -1,14 +1,26 @@
 # EditTrace
 
-EditTrace lets you edit Markdown, email, and plain text with your own language model. Lock the details that must stay unchanged, stream a revision beside the original, and review the diff before using it.
+![EditTrace: Edit the words. Keep the structure. Two documents retain their Markdown skeleton while the prose changes.](public/brand/banner.png)
 
-It runs entirely in your browser and connects directly to your model provider. No account, app backend, or bundled model is required.
+EditTrace edits the prose around your document's structure. It protects recognized Markdown formatting and the details you lock, lets your model rewrite the surrounding text, and checks each passage before accepting it.
+
+Use LM Studio or another OpenAI-compatible provider. The app runs in your browser and connects directly to your model. No account, app backend, or bundled model is required.
 
 [Open EditTrace](https://rajmayank.github.io/EditTrace/) · [Contribute](CONTRIBUTING.md) · [Report an issue](https://github.com/rajmayank/EditTrace/issues/new)
 
+## How the skeleton survives
+
+1. **Protect before generation.** Recognized Markdown syntax, code, links, and your fact locks become unique markers. Paragraph separators stay outside generation.
+2. **Edit the prose.** Your model edits one passage at a time. Heading wording can improve while its `## ` prefix and line break stay protected.
+3. **Check before accepting.** Each marker must return exactly once, in order. Structural checks reject changes such as added HTML or severe shortening. A failed passage gets one retry; if it still fails, the original stays and the reason is flagged.
+
+Protection and validation run in [the browser's editing code](src/core/engine.ts), alongside your prompt. Automatic rules are configurable and recognize syntax, not every Markdown extension or factual claim. Check the blue protected ranges and review the revision.
+
+## In the editor
+
+- **Protect what matters.** Select your own facts or use automatic rules for Markdown structure, signatures, and numbers. The locked text stays word for word.
 - **See what changed.** The original stays on the left; the right starts empty and fills as tokens arrive. Removals are red and struck through, additions are green, and protected text is blue.
 - **Choose the editing pass.** Start with Technical article, Markdown edit, Email polish, or Light copyedit. Change the system prompt when you need different instructions.
-- **Protect what matters.** Select your own facts or use automatic rules for Markdown structure, signatures, and numbers. A failed check gets one automatic retry, then the original passage is retained and flagged.
 - **Review at your own pace.** Switch between source, diff, and sanitized Markdown preview. Link scrolling to keep corresponding blocks in view, or scroll each pane independently. Retry individual retained passages, copy or export the result, and use an edit as the next draft.
 - **Keep the workspace comfortable.** Light and dark themes, responsive panels, keyboard controls, and reduced-motion support work alongside live word counts, reading estimates, and output speed.
 
@@ -47,8 +59,6 @@ Select text in **Source**, then choose **Lock as fact** beside the selection or 
 **Protected passages** explains each automatic rule and lets you turn it off. Markdown protects recognized code blocks, tables, front matter, links, and formatting markers. Numbers, dates, and percentages are protected by default. Email mode detects common signatures and quoted threads; select unusual signatures manually.
 
 Heading wording stays editable. For `# A closer look at connection limits`, the `# ` prefix and line break are protected. The title can change unless you lock it yourself. Complete links, including their labels, stay unchanged.
-
-Protected ranges are replaced with unique markers before a passage goes to the model. Each marker must return exactly once, in order, before EditTrace restores the original text. Paragraph separators stay outside generation. Checks also reject structural changes, severe shortening, and unexpected formatting such as added HTML.
 
 If a passage fails twice, its original text stays in the result. Open the collapsed summary at the bottom of **Edited** to see excerpts and reasons in a bounded, scrollable list. **Show passage** locates the text. **Retry** runs only that original passage with your current model, instructions, and locks; accepted edits stay in place. A failed or stopped retry keeps the previous result and flag.
 

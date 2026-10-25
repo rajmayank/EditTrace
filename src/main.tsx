@@ -7,5 +7,6 @@ import './connection.css';
 import './review.css';
 import './workspace.css';
 import './scroll.css';
+import './brand.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);
