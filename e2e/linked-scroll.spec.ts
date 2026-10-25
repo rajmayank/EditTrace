@@ -94,6 +94,35 @@ test('source, Markdown preview, and reading view share the same block alignment'
   await expectAligned(page, false, true);
 });
 
+test('focus and pane restoration keep the visible rewritten passage aligned', async ({ page }) => {
+  await openDraft(page);
+  const edited = scroller(page, 'result');
+  await edited.hover(); await page.mouse.wheel(0, 2400);
+  await expect.poll(() => edited.evaluate(el => el.scrollTop)).toBeGreaterThan(1500);
+  await expectAligned(page);
+  await page.getByRole('button', { name: 'Enter focus mode' }).click();
+  await expectAligned(page);
+  await page.getByRole('button', { name: 'Collapse Original pane' }).click();
+  const before = await edited.evaluate(el => el.scrollTop);
+  await edited.hover(); await page.mouse.wheel(0, 1200);
+  await expect.poll(() => edited.evaluate(el => el.scrollTop)).toBeGreaterThan(before + 1000);
+  const visible = await visibleBlock(page, 'result');
+  await page.getByRole('button', { name: 'Restore Original pane' }).click();
+  await expectAligned(page);
+  expect((await visibleBlock(page, 'result')).block).toBe(visible.block);
+  await page.getByRole('button', { name: 'Exit focus mode' }).click();
+  await expectAligned(page);
+  await page.getByRole('button', { name: 'Preview', exact: true }).click();
+  await page.getByRole('button', { name: 'Read', exact: true }).click();
+  await page.getByRole('button', { name: 'Enter focus mode' }).click();
+  await expect(page.getByRole('button', { name: 'Preview', exact: true })).toBeFocused();
+  await expectAligned(page, true, true);
+  await page.getByRole('button', { name: 'Collapse Original pane' }).click();
+  await page.getByRole('button', { name: 'Restore Original pane' }).click();
+  await expectAligned(page, true, true);
+  await page.getByRole('button', { name: 'Exit focus mode' }).click();
+});
+
 test('an unfinished result clamps at received content without inserting future passages', async ({ page }) => {
   await openDraft(page, true);
   const original = scroller(page, 'draft'), edited = scroller(page, 'result');

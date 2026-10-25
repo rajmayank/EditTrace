@@ -9,5 +9,6 @@ import './workspace.css';
 import './scroll.css';
 import './brand.css';
 import './inline.css';
+import './focus.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);
