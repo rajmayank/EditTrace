@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, ArrowUpRight, Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, CircleCheck, CircleAlert, Clipboard, Copy, Download, FilePenLine, FileUp, History, Link2, LockKeyhole, MessageSquarePlus, Moon, Play, Plus, RotateCcw, Settings2, ShieldCheck, Square, Sun, Trash2, Unlink, Unplug, X } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, CircleCheck, CircleAlert, Clipboard, Copy, Download, FilePenLine, FileUp, History, Link2, LockKeyhole, MessageSquarePlus, Moon, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Play, Plus, RotateCcw, Settings2, ShieldCheck, Square, Sun, Trash2, Unlink, Unplug, X } from 'lucide-react';
 import { Editor } from './Editor';
 import { Preview } from './Preview';
 import { autoLocks } from './core/protection';
@@ -9,6 +9,7 @@ import { baseURL, connectionError } from './core/api';
 import { PROVIDERS, providerFor } from './core/providers';
 import { useModelConnection } from './useModelConnection';
 import { useLinkedScroll } from './useLinkedScroll';
+import { useFocusMode } from './useFocusMode';
 import { Logo } from './Logo';
 import { RetainedReview } from './RetainedReview';
 import { ReadingStats } from './ReadingStats';
@@ -25,6 +26,7 @@ const defaults: SavedSettings = { connection: DEFAULT_CONNECTION, connectionEnab
 const shortcut = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
 type Entry = Draft & { at: number; id: string };
 type Panel = 'connection' | 'prompt' | 'locks' | 'history' | 'help' | null;
+type EditorSide = 'original' | 'edited';
 
 export default function App() {
   const [settings, setSettings] = useState(() => {
@@ -50,7 +52,11 @@ export default function App() {
   const [panel, setPanel] = useState<Panel>(null);
   const [leftTab, setLeftTab] = useState('source'), [rightTab, setRightTab] = useState('changes');
   const hasResult = !!output || rightTab === 'edit';
-  const scrolling = useLinkedScroll(linkedScroll, leftTab, rightTab);
+  const layoutCapture = useRef<() => void>(() => {});
+  const focus = useFocusMode(() => layoutCapture.current());
+  const [collapsed, setCollapsed] = useState<EditorSide | null>(null);
+  const scrolling = useLinkedScroll(linkedScroll, leftTab, rightTab, `${focus.active}:${collapsed ?? 'both'}`);
+  layoutCapture.current = scrolling.captureLayout;
   const [mobilePane, setMobilePane] = useState('original');
   const [showDiff, setShowDiff] = useState(true);
   const [originalReveal, setOriginalReveal] = useState<Reveal>(), [resultReveal, setResultReveal] = useState<Reveal>();
@@ -95,6 +101,20 @@ export default function App() {
   }
   const snapshot = (): Draft => ({ source, output, outputLocks: resultProtection.complete ? resultProtection.locks : undefined, manual, format, name, issues, stats: stats ?? undefined });
   const togglePanel = (p: Panel) => setPanel(current => current === p ? null : p);
+  function showPane(side: EditorSide) {
+    setMobilePane(side);
+    setCollapsed(hidden => hidden === side ? null : hidden);
+  }
+  function collapsePane(side: EditorSide) {
+    scrolling.captureLayout();
+    setCollapsed(side);
+    requestAnimationFrame(() => document.getElementById(`restore-${side}`)?.focus({ preventScroll: true }));
+  }
+  function restorePane(side: EditorSide) {
+    scrolling.captureLayout();
+    setCollapsed(null);
+    requestAnimationFrame(() => document.getElementById(`collapse-${side}`)?.focus({ preventScroll: true }));
+  }
   const clearReveal = () => { setOriginalReveal(undefined); setResultReveal(undefined); setChangeIndex(-1); };
   const resetResultLocks = () => { setOutputLocks(undefined); inlineSession.current = null; setRightTab('changes'); };
   const invalidate = () => { setOutput(''); resetResultLocks(); setProgress(null); setIssues([]); setStats(null); setStatus(''); clearReveal(); };
@@ -116,6 +136,18 @@ export default function App() {
   }, [panel]);
   useEffect(() => () => { abort.current?.abort(); }, []);
   useEffect(() => {
+    if (!focus.active) return;
+    const frame = requestAnimationFrame(() => {
+      const preferEdited = collapsed === 'original' || rightTab === 'edit' && collapsed !== 'edited';
+      const side = window.innerWidth <= 700 ? mobilePane : preferEdited ? 'edited' : 'original';
+      const pane = document.querySelector(side === 'edited' ? '.result-panel' : '.draft-panel');
+      const editor = [...(pane?.querySelectorAll<HTMLElement>('.cm-content') ?? [])].find(element => element.getClientRects().length);
+      const target = editor ?? pane?.querySelector<HTMLElement>('.segmented .active');
+      target?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focus.active]);
+  useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); document.getElementById('run-edit')?.click(); }
     };
@@ -127,7 +159,7 @@ export default function App() {
     clearReveal();
     setStats(null);
     resetResultLocks();
-    setSource(value); setOutput(''); setManual([]); setProgress(null); setIssues([]); setSelection({ from: 0, to: 0 }); setStatus(''); setMobilePane('original');
+    setSource(value); setOutput(''); setManual([]); setProgress(null); setIssues([]); setSelection({ from: 0, to: 0 }); setStatus(''); showPane('original');
     if (newName) setName(newName);
   }
   function changeSource(value: string, map: (ranges: Span[]) => Span[]) {
@@ -166,7 +198,7 @@ export default function App() {
     if (!modelReady()) return;
     abort.current = new AbortController();
     clearReveal();
-    busyRef.current = true; setBusy(true); setStatus(''); setNotice(''); setLeftTab('source'); setRightTab('changes'); setMobilePane('edited'); setProgress(null);
+    busyRef.current = true; setBusy(true); setStatus(''); setNotice(''); setLeftTab('source'); setRightTab('changes'); showPane('edited'); setProgress(null);
     setOutput(''); setIssues([]); setRetrying(null); setStats(null);
     setOutputLocks([]); inlineSession.current = null;
     let latestOutput = '', recoveryOutput = source, received = false;
@@ -209,7 +241,7 @@ export default function App() {
     const signal = abort.current.signal;
     busyRef.current = true; setBusy(true); setRetrying(target.from); setStatus(''); setNotice('');
     setStats(null);
-    setRightTab('changes'); setMobilePane('edited');
+    setRightTab('changes'); showPane('edited');
     setResultReveal({ from: target.outputFrom, to: target.outputFrom, id: ++revealId.current });
     let lastPaint = 0, lastRetry = false;
     let latestStats: GenerationStats | null = null;
@@ -249,7 +281,7 @@ export default function App() {
   }
   const lockSelection = () => lockRange(selection);
   function locateOriginal(range: Span) {
-    setOriginalReveal({ ...range, id: ++revealId.current }); setLeftTab('source'); setMobilePane('original');
+    setOriginalReveal({ ...range, id: ++revealId.current }); setLeftTab('source'); showPane('original');
   }
   function navigateChange(direction: number) {
     if (!diff.before.length) return;
@@ -258,7 +290,7 @@ export default function App() {
   }
   function locateRetained(issue: Issue) {
     setResultReveal({ from: issue.outputFrom, to: issue.outputTo, id: ++revealId.current });
-    setRightTab('changes'); setMobilePane('edited');
+    setRightTab('changes'); showPane('edited');
     resultPanel.current?.scrollIntoView?.({ block: 'nearest' });
   }
   function preset(id: string) {
@@ -294,7 +326,7 @@ export default function App() {
     setSource(entry.source); setOutput(entry.output); setManual(entry.manual); setFormat(entry.format); setName(draftTitle(entry.name)); setProgress(null); setIssues(entry.issues ?? []); setStatus('Restored from history.'); setPanel(null);
   }
 
-  return <div className="app-shell">
+  return <div className={'app-shell' + (focus.active ? ' focus-mode' : '')}>
     <header className="topbar">
       <a className="brand" href="./" aria-label="EditTrace home"><Logo /><span>Edit<span className="brand-light">Trace</span></span></a>
       <div className="top-actions">
@@ -319,7 +351,7 @@ export default function App() {
       </section>
       <div className="document-bar">
         <div className="document-title"><input aria-label="Document name" value={name} onChange={e => setName(e.target.value)} disabled={busy} /><span className="local-label">Structure protected. Changes checked.</span></div>
-        <div className="document-actions"><button onClick={() => togglePanel('prompt')} disabled={busy}><Settings2 size={15} />Instructions</button><button onClick={() => togglePanel('help')}><CircleHelp size={16} /><span className="hide-small">Help</span></button><a className="feedback-button" aria-label="Give feedback" title="Give feedback on GitHub" href="https://github.com/rajmayank/EditTrace/issues/new" target="_blank" rel="noopener noreferrer"><MessageSquarePlus size={15} /><span className="hide-small">Feedback</span></a></div>
+        <div className="document-actions"><button onClick={() => togglePanel('prompt')} disabled={busy}><Settings2 size={15} />Instructions</button><button onClick={() => togglePanel('help')}><CircleHelp size={16} /><span className="hide-small">Help</span></button><a className="feedback-button" aria-label="Give feedback" title="Give feedback on GitHub" href="https://github.com/rajmayank/EditTrace/issues/new" target="_blank" rel="noopener noreferrer"><MessageSquarePlus size={15} /><span className="hide-small">Feedback</span></a><button className="focus-toggle" aria-label="Enter focus mode" title="Focus mode" onClick={focus.enter}><Maximize2 size={16} /><span className="hide-small">Focus</span></button></div>
       </div>
       <div className="workspace-controls">
         <div className="preset-control"><span className="small-label">EDIT FOR</span><select aria-label="Editing preset" value={settings.preset} disabled={busy} onChange={e => preset(e.target.value)}>{PRESETS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}<option value="custom" disabled>Custom instructions</option></select></div>
@@ -330,20 +362,22 @@ export default function App() {
         <button aria-pressed={mobilePane === 'original'} className={mobilePane === 'original' ? 'active' : ''} onClick={() => setMobilePane('original')}><span>01</span>Original</button>
         <button aria-pressed={mobilePane === 'edited'} className={mobilePane === 'edited' ? 'active' : ''} onClick={() => setMobilePane('edited')}><span>02</span>Edited{output && <i className="result-dot" />}</button>
       </div>
-      <div className="workspace" data-mobile-pane={mobilePane} onScrollCapture={scrolling.onScrollCapture} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); void importFile(e.dataTransfer.files[0]); }}>
-        <section className="editor-panel draft-panel" aria-label="Draft panel">
-          <header className="panel-header"><div className="panel-title"><span className="panel-number">01</span><h1>Original</h1><ReadingStats estimate={originalReading} label="Original" /></div><div className="segmented" role="group" aria-label="Original view"><button className={leftTab === 'source' ? 'active' : ''} onClick={() => setLeftTab('source')}>Source</button><button className={leftTab === 'preview' ? 'active' : ''} onClick={() => setLeftTab('preview')} disabled={format !== 'markdown'}>Preview</button></div></header>
-          <div className="editor-body">
+      <div className="workspace" data-mobile-pane={mobilePane} data-collapsed={collapsed ?? 'none'} onScrollCapture={scrolling.onScrollCapture} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); void importFile(e.dataTransfer.files[0]); }}>
+        <section className="editor-panel draft-panel" aria-label="Draft panel" data-collapsed={collapsed === 'original'}>
+          <button id="restore-original" className="collapsed-handle" aria-label="Restore Original pane" aria-controls="original-editor" aria-expanded="false" title="Restore Original pane" onClick={() => restorePane('original')}><PanelLeftOpen size={17} /><span>Original</span></button>
+          <header className="panel-header"><div className="panel-title"><span className="panel-number">01</span><h1>Original</h1><ReadingStats estimate={originalReading} label="Original" /></div><div className="panel-actions"><div className="segmented" role="group" aria-label="Original view"><button className={leftTab === 'source' ? 'active' : ''} onClick={() => setLeftTab('source')}>Source</button><button className={leftTab === 'preview' ? 'active' : ''} onClick={() => setLeftTab('preview')} disabled={format !== 'markdown'}>Preview</button></div><button id="collapse-original" className="icon-button pane-collapse" aria-label="Collapse Original pane" aria-controls="original-editor" aria-expanded="true" title="Collapse Original pane" onClick={() => collapsePane('original')}><PanelLeftClose size={16} /></button></div></header>
+          <div id="original-editor" className="editor-body">
             {leftTab === 'preview' ? <Preview value={source} scrollRef={scrolling.original} /> : <Editor label="Original draft" value={source} scrollRef={scrolling.original} readOnly={busy} isMarkdown={format === 'markdown'} locks={locks} changes={diff.before} changeKind="removed" onChange={changeSource} onSelection={setSelection} onLockSelection={lockRange} reveal={originalReveal} />}
             {!source && leftTab === 'source' && <div className="empty-draft"><span className="empty-eyebrow">YOUR WORDS. YOUR STRUCTURE.</span><p>Edit the words.<br />Keep the structure.</p><span>Paste Markdown or text. Lock anything that must stay word for word.</span><button className="sample-button" disabled={busy} onClick={() => { preset('article'); replaceSource(SAMPLE, 'Connection limits.md'); }}>Try a sample <ArrowRight size={14} /></button></div>}
           </div>
           <footer className="panel-footer"><div className="footer-actions"><button onClick={async () => { try { const value = await navigator.clipboard.readText(); if (!busyRef.current) replaceSource(value); } catch { setNotice('Use ⌘V or Ctrl+V in the editor to paste.'); } }} disabled={busy}><Clipboard size={14} />Paste</button><button onClick={() => importRef.current?.click()} disabled={busy}><FileUp size={14} />Import</button><button className="icon-button" title="Download original" aria-label="Download original" onClick={() => download(source, false)} disabled={!source || busy}><Download size={14} /></button></div><span className="footer-meta">{format === 'markdown' ? 'Markdown' : format === 'email' ? 'Email' : 'Plain text'}<span className="dot-separator">·</span>{source.length.toLocaleString()} chars</span></footer>
         </section>
         <div className="middle-rail"><button className="scroll-link" aria-label="Link scrolling" aria-pressed={linkedScroll} title={linkedScroll ? 'Linked scrolling on. Click to scroll independently.' : 'Link scrolling between panes.'} disabled={!output} onClick={() => setSettings(s => ({ ...s, linkedScroll: !linkedScroll }))}>{linkedScroll ? <Link2 size={16} /> : <Unlink size={16} />}</button></div>
-        <section ref={resultPanel} className={'editor-panel result-panel' + (rightTab === 'edit' ? ' editing-result' : '')} aria-label="Edited panel">
-          <header className="panel-header"><div className="panel-title"><span className="panel-number">02</span><h2>Edited</h2>{hasResult && <ReadingStats estimate={editedReading} label="Edited" />}</div><div className="segmented" role="group" aria-label="Edited view"><button className={rightTab === 'changes' ? 'active' : ''} onClick={() => resultView('changes')}>Changes</button><button className={rightTab === 'read' ? 'active' : ''} onClick={() => resultView('read')}>Read</button>{hasResult && <button className={rightTab === 'edit' ? 'active' : ''} aria-pressed={rightTab === 'edit'} title={busy ? 'Available after generation finishes.' : !resultProtection.complete ? 'Run a fresh edit to refresh protected ranges.' : rightTab === 'edit' ? 'Finish editing and review the changes.' : 'Edit the result. Blue text stays locked.'} disabled={busy || !resultProtection.complete} onClick={() => resultView(rightTab === 'edit' ? 'changes' : 'edit')}>Edit</button>}</div></header>
+        <section ref={resultPanel} className={'editor-panel result-panel' + (rightTab === 'edit' ? ' editing-result' : '')} aria-label="Edited panel" data-collapsed={collapsed === 'edited'}>
+          <button id="restore-edited" className="collapsed-handle" aria-label="Restore Edited pane" aria-controls="edited-editor" aria-expanded="false" title="Restore Edited pane" onClick={() => restorePane('edited')}><PanelRightOpen size={17} /><span>Edited</span></button>
+          <header className="panel-header"><div className="panel-title"><span className="panel-number">02</span><h2>Edited</h2>{hasResult && <ReadingStats estimate={editedReading} label="Edited" />}</div><div className="panel-actions"><div className="segmented" role="group" aria-label="Edited view"><button className={rightTab === 'changes' ? 'active' : ''} onClick={() => resultView('changes')}>Changes</button><button className={rightTab === 'read' ? 'active' : ''} onClick={() => resultView('read')}>Read</button>{hasResult && <button className={rightTab === 'edit' ? 'active' : ''} aria-pressed={rightTab === 'edit'} title={busy ? 'Available after generation finishes.' : !resultProtection.complete ? 'Run a fresh edit to refresh protected ranges.' : rightTab === 'edit' ? 'Finish editing and review the changes.' : 'Edit the result. Blue text stays locked.'} disabled={busy || !resultProtection.complete} onClick={() => resultView(rightTab === 'edit' ? 'changes' : 'edit')}>Edit</button>}</div><button id="collapse-edited" className="icon-button pane-collapse" aria-label="Collapse Edited pane" aria-controls="edited-editor" aria-expanded="true" title="Collapse Edited pane" onClick={() => collapsePane('edited')}><PanelRightClose size={16} /></button></div></header>
           {output && !busy && !resultProtection.complete && <p className="result-edit-note">Run a fresh edit to refresh protected ranges before editing inline.</p>}
-          <div className="editor-body">
+          <div id="edited-editor" className="editor-body">
             {hasResult ? <><div className="result-source" hidden={rightTab === 'read' && format === 'markdown'}><Editor label="Edited result" value={output} scrollRef={rightTab === 'read' && format === 'markdown' ? undefined : scrolling.edited} readOnly={busy || rightTab !== 'edit' || !resultProtection.complete} lockEdits locks={resultProtection.locks} onChange={changeOutput} onBlockedEdit={() => setNotice('Protected text stays locked. Change or unlock it in Original.')} isMarkdown={format === 'markdown'} changes={rightTab !== 'read' ? diff.after : []} changeKind="added" retained={issues.map(issue => ({ from: issue.outputFrom, to: issue.outputTo }))} reveal={resultReveal} /></div>{rightTab === 'read' && format === 'markdown' && <Preview value={output} scrollRef={scrolling.edited} />}</> : busy ? <div className="waiting-result" role="status"><span className="spinner" />Waiting for your model…</div> : <div className="empty-result"><span className="empty-result-symbol"><FilePenLine size={27} strokeWidth={1.4} /></span><p>Protected structure.<br />Visible changes.</p><span>Each passage is checked for protected text and structural changes.</span><div className="diff-key"><span><i className="removed-key" />Removed</span><span><i className="added-key" />Added</span><span><i className="locked-key" />Protected</span></div></div>}
           </div>
           {!!issues.length && (!busy || retrying !== null) && <RetainedReview issues={issues} source={source} active={resultReveal} onLocate={locateRetained} onRetry={issue => void retryOne(issue)} retrying={retrying} />}
@@ -353,7 +387,7 @@ export default function App() {
 
       <div className="edit-bar">
         <div className="edit-feedback"><div className="edit-status" role="status" aria-live="polite">{busy ? <><span className="spinner" />{retrying !== null ? progress?.retry ? 'Checking passage locks again' : 'Retrying passage' : progress?.retry ? 'Checking locks again' : 'Editing'}{retrying === null && <span className="muted">{progress?.done ?? 0}/{progress?.total ?? '…'} passages</span>}</> : status ? <span>{status}</span> : <><LockKeyhole size={15} /><span>Select text to keep it word for word.</span></>}</div>{stats && <OutputRate stats={stats} active={busy} />}</div>
-        <button id="run-edit" className={'primary-button ' + (busy ? 'stop-button' : '')} disabled={!busy && !source.trim()} onClick={() => void run()}>{busy ? <Square size={14} fill="currentColor" strokeWidth={0} /> : <Play size={15} fill="currentColor" />}{busy ? 'Stop' : 'Edit draft'}{!busy && <kbd>{shortcut} ↵</kbd>}</button>
+        <div className="edit-actions">{focus.active && <button className="focus-exit text-button" aria-label="Exit focus mode" onClick={focus.exit} title="Exit focus mode (Esc)"><Minimize2 size={16} /><span>Exit focus</span><kbd>Esc</kbd></button>}<button id="run-edit" className={'primary-button ' + (busy ? 'stop-button' : '')} disabled={!busy && !source.trim()} onClick={() => void run()}>{busy ? <Square size={14} fill="currentColor" strokeWidth={0} /> : <Play size={15} fill="currentColor" />}{busy ? 'Stop' : 'Edit draft'}{!busy && <kbd>{shortcut} ↵</kbd>}</button></div>
       </div>
       {hasResult && !busy && <div className="review-bar"><label className="check-label"><input type="checkbox" checked={showDiff} onChange={e => setShowDiff(e.target.checked)} />Show changes</label><div className="change-navigation"><span>{diff.before.length} removals · {diff.after.length} additions</span><button aria-label="Previous change" disabled={!diff.before.length} onClick={() => navigateChange(-1)}><ChevronLeft size={15} /></button><button aria-label="Next change" disabled={!diff.before.length} onClick={() => navigateChange(1)}><ChevronRight size={15} /></button></div></div>}
       <footer className="app-footer"><span className="attribution">Built and maintained by <a href="https://mayankraj.com" target="_blank" rel="noreferrer">Mayank Raj</a></span><div className="footer-links"><a href="https://github.com/rajmayank/EditTrace" target="_blank" rel="noreferrer">GitHub repo<ArrowUpRight size={11} /></a><span>Apache 2.0</span></div></footer>
@@ -379,7 +413,7 @@ export default function App() {
         {panel === 'prompt' && <div className="dialog-content"><div className="preset-chips">{PRESETS.map(p => <button key={p.id} className={settings.preset === p.id ? 'selected' : ''} onClick={() => preset(p.id)}>{p.name}</button>)}</div><label>System prompt<textarea className="prompt-textarea" value={settings.prompt} onChange={e => setSettings(s => ({ ...s, preset: 'custom', prompt: e.target.value }))} /></label><p className="dialog-description">Applied to every passage. Lock checks run after generation.</p><div className="field-row"><button className="secondary-button" onClick={() => preset('article')}><RotateCcw size={14} />Reset</button><button className="primary-button" onClick={() => setPanel(null)}>Done<Check size={15} /></button></div></div>}
         {panel === 'locks' && <div className="dialog-content"><div className="protection-helper" role="note"><LockKeyhole size={17} /><p>Protected text stays word for word. Use it for exact facts and formatting. Select custom facts in Source and choose <b>Lock as fact</b>.</p></div><label>Document type<select value={format} onChange={e => { setFormat(e.target.value as Format); setLeftTab('source'); invalidate(); }}><option value="markdown">Markdown</option><option value="email">Email</option><option value="text">Plain text</option></select></label><div className="lock-options">{([['structure', 'Structure & notation', 'Preserves Markdown notation, code blocks, tables, front matter, and line breaks. Heading wording stays editable.'], ['inline', 'Code & links', 'Preserves inline code, full links including labels, addresses, and math. Use for commands and references.'], ['numbers', 'Numbers', 'Preserves numbers, dates, percentages, and numeric limits. Use for figures that must stay exact.'], ['signature', 'Email signature', 'Preserves detected signatures and quoted threads in Email mode. Lock unusual signatures manually.']] as const).map(([key, title, description]) => <label className="rule-toggle" key={key}><input type="checkbox" checked={settings.locks[key]} onChange={e => { setSettings(s => ({ ...s, locks: { ...s.locks, [key]: e.target.checked } })); invalidate(); }} /><span><b>{title}</b><small>{description}</small></span></label>)}</div><div className="lock-list">{manual.map((r, i) => <div key={i}><LockKeyhole size={13} /><span>{source.slice(r.from, r.to)}</span><button aria-label={'Remove lock ' + (i + 1)} onClick={() => { setManual(m => m.filter((_, j) => j !== i)); invalidate(); }}><X size={13} /></button></div>)}{!manual.length && <p className="muted">Select a passage in Source, then choose Lock as fact.</p>}</div><span className="muted">{locks.length} protected ranges. Check the blue highlights in Source before editing.</span><button className="primary-button full" onClick={() => setPanel(null)}>Done<Check size={15} /></button></div>}
         {panel === 'history' && <div className="dialog-content"><div className="history-head"><span className="muted">{settings.saveDrafts ? 'Saved on this device.' : 'This tab only.'} Up to 12 edits.</span><button className="text-button" disabled={!history.length} onClick={() => { setHistory([]); remove('history'); }}><Trash2 size={14} />Clear</button></div>{history.length ? history.map(h => <button key={h.id} className="history-entry" onClick={() => historyLoad(h)}><span><b>{h.name}</b><small>{new Date(h.at).toLocaleString()} · {estimateReading(h.source, h.format).words} words</small></span><ArrowRight size={16} /></button>) : <div className="history-empty"><History size={25} /><p>Your edits will appear here.</p></div>}</div>}
-        {panel === 'help' && <div className="dialog-content help-content"><p><b>Protection runs outside the model.</b> Recognized formatting and locked details are replaced with markers before a passage is sent. Each marker must return once, in order, before the protected text is restored.</p><p>Connect a model, paste a draft, and choose an editing preset. Select any text in Source and choose <b>Lock as fact</b> to keep it unchanged.</p><p><b>Markdown</b> keeps recognized code blocks, tables, heading markers, links, and line breaks. Heading wording stays editable. <b>Email</b> detects common signatures. Protected text is blue on both sides.</p><p>Choose <b>Edit</b> in Edited to refine the prose locally after generation. Protected ranges stay locked. Copy, export, counts, and optional draft saving use your current version.</p><p>Each passage is checked after generation. A failed check gets one retry. If it still fails, the original passage stays. In Edited, choose <b>Show passage</b> to locate it or <b>Retry</b> to run just that passage again. Other edits stay in place.</p><p>Read the result before using it. Text outside locks can still change meaning. Use a model that follows system instructions and copies markers accurately.</p><p>Your draft goes directly to the server you choose. Settings stay in this browser; saving drafts and API keys is optional. Preview does not load external images.</p><p><b>Connection trouble?</b> Enable CORS, allow the browser’s local-network permission, and check your server address. Use HTTPS for a remote server. If your browser blocks a local connection from GitHub Pages, run EditTrace locally with <code>npm run dev</code>.</p><a href="https://github.com/rajmayank/EditTrace" target="_blank" rel="noreferrer" className="source-link">Source & setup<ArrowUpRight size={13} /></a></div>}
+        {panel === 'help' && <div className="dialog-content help-content"><p><b>Protection runs outside the model.</b> Recognized formatting and locked details are replaced with markers before a passage is sent. Each marker must return once, in order, before the protected text is restored.</p><p>Connect a model, paste a draft, and choose an editing preset. Select any text in Source and choose <b>Lock as fact</b> to keep it unchanged.</p><p><b>Markdown</b> keeps recognized code blocks, tables, heading markers, links, and line breaks. Heading wording stays editable. <b>Email</b> detects common signatures. Protected text is blue on both sides.</p><p>Choose <b>Edit</b> in Edited to refine the prose locally after generation. Protected ranges stay locked. Copy, export, counts, and optional draft saving use your current version.</p><p>Each passage is checked after generation. A failed check gets one retry. If it still fails, the original passage stays. In Edited, choose <b>Show passage</b> to locate it or <b>Retry</b> to run just that passage again. Other edits stay in place.</p><p><b>Focus</b> fills the screen with your editors. Collapse either pane from its header, then use the side handle to restore it. Press <b>Esc</b> to leave focus mode.</p><p>Read the result before using it. Text outside locks can still change meaning. Use a model that follows system instructions and copies markers accurately.</p><p>Your draft goes directly to the server you choose. Settings stay in this browser; saving drafts and API keys is optional. Preview does not load external images.</p><p><b>Connection trouble?</b> Enable CORS, allow the browser’s local-network permission, and check your server address. Use HTTPS for a remote server. If your browser blocks a local connection from GitHub Pages, run EditTrace locally with <code>npm run dev</code>.</p><a href="https://github.com/rajmayank/EditTrace" target="_blank" rel="noreferrer" className="source-link">Source & setup<ArrowUpRight size={13} /></a></div>}
       </div>
     </dialog>
   </div>;
