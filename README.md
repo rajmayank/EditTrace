@@ -26,6 +26,8 @@ Paragraph separators stay outside generation. Editable passages are processed se
 
 A failed passage gets one retry. If it still fails, EditTrace retains that original passage. The bottom of the Edited panel lists its excerpt and the reason. **Show passage** scrolls to and highlights the exact retained text, including after earlier edits change its position. Stopping an edit keeps completed passages and restores any unfinished passage. Copy and export stay disabled during generation.
 
+Choose **Retry** beside a retained passage to submit just that original passage with the current model, instructions, and locks. Its replacement streams into the existing result. Other edits stay intact. A successful retry removes the flag; a failed or stopped retry keeps the previous result and its flag. Review flags are included when drafts or history are saved locally.
+
 Detection is based on recognizable syntax, not a complete understanding of every Markdown extension or email format. Check the blue ranges before editing. Locks preserve literal text; they do not verify the meaning of the surrounding rewrite. The model sees each editable passage without the rest of the article.
 
 ## Connection and storage
@@ -48,6 +50,8 @@ Saved configurations are checked again after refresh. A successful stream also u
 Connection settings and the current instructions are saved in browser storage. API keys stay in memory unless **Remember API key on this device** is enabled. Saving a key uses browser local storage, not an encrypted vault.
 
 Drafts and the last 12 edits stay in the tab by default. **Save drafts on this device** opts into browser storage. Turning it off removes saved drafts and history. Clearing browser storage removes saved settings too. The Markdown preview is sanitized and does not load external images.
+
+**Feedback** opens a new GitHub issue in another tab. The link does not include draft text, credentials, or connection settings.
 
 GitHub Pages uses HTTPS. Remote model servers need HTTPS and must allow the editor's origin through CORS. Local connections also depend on the browser's mixed-content and local-network rules. Allow local-network access if prompted. If the browser still blocks the request, run the editor locally. Disabling browser security is not required.
 

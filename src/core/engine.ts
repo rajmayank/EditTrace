@@ -12,6 +12,47 @@ or add explanations. Protected line breaks must stay as markers. Do not add new 
 Preserve leading and trailing spaces when the passage continues a sentence.`;
 
 export type Progress = { text: string; preview: string; streamed: boolean; issues: Issue[]; done: number; total: number; retry: boolean };
+export type PassageProgress = Pick<Progress, 'text' | 'issues' | 'streamed' | 'retry'>;
+export class PassageStateError extends Error {}
+
+/** Retry one retained unit, preserving every other accepted edit and source offset. */
+export async function retryPassage(
+  source: string, output: string, locks: Lock[], issues: Issue[], target: Issue,
+  connection: Connection, instructions: string, signal: AbortSignal,
+  onProgress: (progress: PassageProgress) => void, generate: typeof complete = complete,
+): Promise<PassageProgress> {
+  const index = issues.findIndex(issue => issue.from === target.from && issue.to === target.to && issue.outputFrom === target.outputFrom && issue.outputTo === target.outputTo);
+  const validRange = (from: number, to: number, length: number) => Number.isSafeInteger(from) && Number.isSafeInteger(to) && from >= 0 && to > from && to <= length;
+  // Saved review metadata must still describe literal original text before it is submitted.
+  if (index < 0 || issues.some((issue, i) => !validRange(issue.from, issue.to, source.length) || !validRange(issue.outputFrom, issue.outputTo, output.length) || source.slice(issue.from, issue.to) !== output.slice(issue.outputFrom, issue.outputTo) || i > 0 && (issues[i - 1].to > issue.from || issues[i - 1].outputTo > issue.outputFrom))) {
+    throw new PassageStateError('This passage no longer matches the draft. Run a fresh edit before retrying.');
+  }
+  const original = source.slice(target.from, target.to);
+  const localLocks = locks.filter(lock => lock.from < target.to && lock.to > target.from).map(lock => ({ ...lock, from: Math.max(target.from, lock.from) - target.from, to: Math.min(target.to, lock.to) - target.from }));
+  const editable = planDocument(original, localLocks).filter(unit => unit.editable);
+  if (editable.length !== 1) throw new PassageStateError('This passage cannot be retried separately. Run a fresh edit with the current locks.');
+  const prefix = output.slice(0, target.outputFrom), suffix = output.slice(target.outputTo);
+  // Source positions stay fixed; later output positions move with the replacement length.
+  const patch = (text: string, keep: boolean, message = target.message): Pick<PassageProgress, 'text' | 'issues'> => {
+    const delta = text.length - original.length;
+    return {
+      text: prefix + text + suffix,
+      issues: issues.flatMap((issue, i) => i === index ? keep ? [{ ...issue, outputTo: issue.outputFrom + text.length, message }] : [] : [{ ...issue, outputFrom: issue.outputFrom + (i > index ? delta : 0), outputTo: issue.outputTo + (i > index ? delta : 0) }]),
+    };
+  };
+  let streamed = false;
+  try {
+    const result = await editDocument(original, localLocks, connection, instructions, signal, progress => {
+      streamed = progress.streamed;
+      onProgress({ ...patch(progress.preview || original, true), streamed, retry: progress.retry });
+    }, generate);
+    return { ...patch(result.text, !!result.issues.length, result.issues[0]?.message), streamed: result.streamed, retry: false };
+  } catch (error) {
+    onProgress({ text: output, issues, streamed, retry: false });
+    throw error;
+  }
+}
+
 export async function editDocument(
   source: string, locks: Lock[], connection: Connection, instructions: string, signal: AbortSignal,
   onProgress: (progress: Progress) => void,

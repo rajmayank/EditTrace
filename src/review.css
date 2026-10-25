@@ -13,8 +13,13 @@
 .retained-heading h3 { margin: 0; font-size: 11px; font-weight: 550; }
 .retained-review ol { list-style: none; padding: 0; margin: 0; max-height: 130px; overflow-y: auto; scrollbar-width: thin; }
 .retained-review li + li { border-top: 1px solid var(--line); }
+.retained-review li { display: flex; align-items: center; gap: 7px; }
 .retained-review button { width: 100%; display: flex; justify-content: space-between; gap: 14px; white-space: normal; text-align: left; padding: 7px 4px; }
 .retained-review button.active { background: var(--accent-soft); }
+.retained-review .retained-locate { flex: 1; min-width: 0; width: auto; }
+.retained-review .retry-passage { flex-shrink: 0; width: auto; gap: 5px; padding: 5px 8px; min-height: 32px; color: var(--accent); background: var(--surface); border: 1px solid var(--line); font-size: 10px; white-space: nowrap; }
+.retained-review .retry-passage:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--accent); }
+.retained-review .retry-passage:disabled { opacity: .65; }
 .retained-detail { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .retained-detail strong { font-size: 11px; font-weight: 450; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .retained-detail small { font-size: 10px; font-weight: 400; color: var(--muted); line-height: 1.5; }

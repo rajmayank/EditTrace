@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { diffWordsWithSpace } from 'diff';
-import { ArrowRight, ArrowUpRight, Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, CircleCheck, CircleAlert, Clipboard, Copy, Download, FilePenLine, FileUp, History, LockKeyhole, Moon, Play, Plus, RotateCcw, Settings2, ShieldCheck, Square, Sun, Trash2, Unplug, X } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, CircleCheck, CircleAlert, Clipboard, Copy, Download, FilePenLine, FileUp, History, LockKeyhole, MessageSquarePlus, Moon, Play, Plus, RotateCcw, Settings2, ShieldCheck, Square, Sun, Trash2, Unplug, X } from 'lucide-react';
 import { Editor } from './Editor';
 import { Preview } from './Preview';
 import { autoLocks } from './core/protection';
@@ -9,7 +9,7 @@ import { PROVIDERS, providerFor } from './core/providers';
 import { useModelConnection } from './useModelConnection';
 import { Logo } from './Logo';
 import { RetainedReview } from './RetainedReview';
-import { editDocument, type Progress } from './core/engine';
+import { editDocument, PassageStateError, retryPassage, type Progress } from './core/engine';
 import { DEFAULT_LOCKS, type Connection, type Format, type Issue, type Reveal, type Span } from './core/types';
 import { PRESETS, SAMPLE } from './core/presets';
 import { persistSettings, read, remove, write, type Draft, type SavedSettings } from './core/storage';
@@ -34,6 +34,8 @@ export default function App() {
   const [manual, setManual] = useState<Span[]>(initial?.manual ?? []);
   const [selection, setSelection] = useState<Span>({ from: 0, to: 0 });
   const [progress, setProgress] = useState<Progress | null>(null);
+  const [issues, setIssues] = useState<Issue[]>(initial?.issues ?? []);
+  const [retrying, setRetrying] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(''), [notice, setNotice] = useState('');
   const [manualModel, setManualModel] = useState(false);
@@ -82,10 +84,10 @@ export default function App() {
     setSettings(s => ({ ...s, connectionEnabled: true }));
     void modelConnection.test();
   }
-  const snapshot = (): Draft => ({ source, output, manual, format, name });
+  const snapshot = (): Draft => ({ source, output, manual, format, name, issues });
   const togglePanel = (p: Panel) => setPanel(current => current === p ? null : p);
   const clearReveal = () => { setOriginalReveal(undefined); setResultReveal(undefined); setChangeIndex(-1); };
-  const invalidate = () => { setOutput(''); setProgress(null); setStatus(''); clearReveal(); };
+  const invalidate = () => { setOutput(''); setProgress(null); setIssues([]); setStatus(''); clearReveal(); };
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = settings.theme;
     if (!persistSettings(settings)) setNotice('Browser storage unavailable. Settings stay in this tab.');
@@ -97,7 +99,7 @@ export default function App() {
       if (!write('draft', snapshot()) || !write('history', history)) setNotice('Could not save locally. Download your draft to keep it.');
     }, 500);
     return () => clearTimeout(timer);
-  }, [settings.saveDrafts, source, output, manual, format, name, history, busy]);
+  }, [settings.saveDrafts, source, output, manual, format, name, issues, history, busy]);
   useEffect(() => {
     if (panel) { dialog.current?.showModal(); }
     else dialog.current?.close();
@@ -113,44 +115,85 @@ export default function App() {
   function replaceSource(value: string, newName?: string) {
     if (busyRef.current) return;
     clearReveal();
-    setSource(value); setOutput(''); setManual([]); setProgress(null); setSelection({ from: 0, to: 0 }); setStatus(''); setMobilePane('original');
+    setSource(value); setOutput(''); setManual([]); setProgress(null); setIssues([]); setSelection({ from: 0, to: 0 }); setStatus(''); setMobilePane('original');
     if (newName) setName(newName);
   }
   function changeSource(value: string, map: (ranges: Span[]) => Span[]) {
     if (value === sourceRef.current || busyRef.current) return;
     clearReveal();
-    setSource(value); setManual(map); setOutput(''); setProgress(null); setStatus('');
+    setSource(value); setManual(map); setOutput(''); setProgress(null); setIssues([]); setStatus('');
+  }
+  function modelReady() {
+    if (settings.connectionEnabled === false || !settings.connection.model.trim()) { setPanel('connection'); setStatus('Choose a model to start.'); return false; }
+    try { baseURL(settings.connection.url); return true; }
+    catch (error) { setPanel('connection'); setStatus((error as Error).message); return false; }
   }
   async function run() {
     if (busyRef.current) { abort.current?.abort(); return; }
     if (!source.trim()) { setNotice('Paste or import a draft first.'); return; }
-    if (settings.connectionEnabled === false || !settings.connection.model.trim()) { setPanel('connection'); setStatus('Choose a model to start.'); return; }
-    try { baseURL(settings.connection.url); } catch (e) { setPanel('connection'); setStatus((e as Error).message); return; }
+    if (!modelReady()) return;
     abort.current = new AbortController();
     clearReveal();
     busyRef.current = true; setBusy(true); setStatus(''); setNotice(''); setLeftTab('source'); setRightTab('changes'); setMobilePane('edited'); setProgress(null);
-    setOutput('');
+    setOutput(''); setIssues([]); setRetrying(null);
     let latestOutput = '', recoveryOutput = source, received = false;
+    let latestIssues: Issue[] = [];
     let lastPaint = 0, lastDone = -1, lastRetry = false;
     const started = { ...snapshot(), output: '' };
     try {
       const result = await editDocument(source, locks, { ...settings.connection }, settings.prompt, abort.current.signal, p => {
         recoveryOutput = p.text;
+        latestIssues = p.issues;
         if (p.streamed) { received = true; modelConnection.streaming(); }
         const now = performance.now();
         if (now - lastPaint > 75 || p.done !== lastDone || p.retry !== lastRetry) {
-          setOutput(p.preview); setProgress(p); lastPaint = now; lastDone = p.done; lastRetry = p.retry;
+          setOutput(p.preview); setProgress(p); setIssues(p.issues); lastPaint = now; lastDone = p.done; lastRetry = p.retry;
         }
       });
       latestOutput = result.text;
+      latestIssues = result.issues; setProgress(result);
       setStatus(result.total ? result.issues.length ? 'Edit complete. Review retained passages in Edited.' : 'Edit complete. Every lock checked.' : 'Everything is protected. Unlock a passage to edit it.');
     } catch (e) {
       latestOutput = received ? recoveryOutput : '';
       if (!abort.current.signal.aborted) modelConnection.failed(e);
       setStatus(abort.current.signal.aborted ? 'Stopped. Unfinished passages kept original.' : connectionError(e));
     } finally {
-      busyRef.current = false; setBusy(false); setOutput(latestOutput);
-      if (latestOutput) setHistory(h => [{ ...started, output: latestOutput, at: Date.now(), id: crypto.randomUUID() }, ...h].slice(0, 12));
+      busyRef.current = false; setBusy(false); setOutput(latestOutput); setIssues(latestIssues);
+      if (latestOutput) setHistory(h => [{ ...started, output: latestOutput, issues: latestIssues, at: Date.now(), id: crypto.randomUUID() }, ...h].slice(0, 12));
+    }
+  }
+  async function retryOne(target: Issue) {
+    if (busyRef.current || !modelReady()) return;
+    const previous = snapshot(), previousIssues = issues;
+    abort.current = new AbortController();
+    const signal = abort.current.signal;
+    busyRef.current = true; setBusy(true); setRetrying(target.from); setStatus(''); setNotice('');
+    setRightTab('changes'); setMobilePane('edited');
+    setResultReveal({ from: target.outputFrom, to: target.outputFrom, id: ++revealId.current });
+    let lastPaint = 0, lastRetry = false;
+    try {
+      const result = await retryPassage(source, output, locks, issues, target, { ...settings.connection }, settings.prompt, signal, update => {
+        if (update.streamed) modelConnection.streaming();
+        const now = performance.now();
+        if (now - lastPaint > 75 || update.retry !== lastRetry) {
+          setOutput(update.text); setIssues(update.issues);
+          setProgress(p => p ? { ...p, ...update, preview: update.text } : null);
+          lastPaint = now; lastRetry = update.retry;
+        }
+      });
+      setOutput(result.text); setIssues(result.issues);
+      const kept = result.issues.find(issue => issue.from === target.from && issue.to === target.to);
+      setStatus(kept ? 'Passage kept original. Review the reason in Edited.' : result.issues.length ? `Passage updated. ${result.issues.length} passage${result.issues.length === 1 ? ' still needs' : 's still need'} review.` : 'Passage updated. Every lock checked.');
+      setResultReveal({ from: target.outputFrom, to: target.outputTo + result.text.length - previous.output.length, id: ++revealId.current });
+      if (!kept) setHistory(h => [{ ...previous, output: result.text, issues: result.issues, at: Date.now(), id: crypto.randomUUID() }, ...h].slice(0, 12));
+    } catch (error) {
+      setOutput(previous.output); setIssues(previousIssues);
+      setResultReveal({ from: target.outputFrom, to: target.outputTo, id: ++revealId.current });
+      if (!signal.aborted && !(error instanceof PassageStateError)) modelConnection.failed(error);
+      setStatus(signal.aborted ? 'Retry stopped. Previous result kept.' : connectionError(error));
+    } finally {
+      busyRef.current = false; setBusy(false); setRetrying(null);
+      setProgress(p => p ? { ...p, retry: false } : null);
     }
   }
   function lockRange(range: Span) {
@@ -201,9 +244,8 @@ export default function App() {
   function historyLoad(entry: Entry) {
     if (busy) return;
     clearReveal();
-    setSource(entry.source); setOutput(entry.output); setManual(entry.manual); setFormat(entry.format); setName(entry.name); setProgress(null); setStatus('Restored from history.'); setPanel(null);
+    setSource(entry.source); setOutput(entry.output); setManual(entry.manual); setFormat(entry.format); setName(entry.name); setProgress(null); setIssues(entry.issues ?? []); setStatus('Restored from history.'); setPanel(null);
   }
-  const issues = progress?.issues ?? [];
 
   return <div className="app-shell">
     <header className="topbar">
@@ -219,7 +261,7 @@ export default function App() {
     <main>
       <div className="document-bar">
         <div className="document-title"><input aria-label="Document name" value={name} onChange={e => setName(e.target.value)} disabled={busy} /><span className="local-label">Your model. Your words.</span></div>
-        <div className="document-actions"><button onClick={() => togglePanel('prompt')} disabled={busy}><Settings2 size={15} />Instructions</button><button onClick={() => togglePanel('help')}><CircleHelp size={16} /><span className="hide-small">Help</span></button></div>
+        <div className="document-actions"><button onClick={() => togglePanel('prompt')} disabled={busy}><Settings2 size={15} />Instructions</button><button onClick={() => togglePanel('help')}><CircleHelp size={16} /><span className="hide-small">Help</span></button><a className="feedback-button" aria-label="Give feedback" title="Give feedback on GitHub" href="https://github.com/rajmayank/EditTrace/issues/new" target="_blank" rel="noopener noreferrer"><MessageSquarePlus size={15} /><span className="hide-small">Feedback</span></a></div>
       </div>
       <div className="privacy-note"><ShieldCheck size={15} /><span><strong>No tracking. No server-side storage.</strong> Optional saves stay in your browser.</span></div>
       <div className="workspace-controls">
@@ -246,13 +288,13 @@ export default function App() {
           <div className="editor-body">
             {output ? rightTab === 'read' && format === 'markdown' ? <Preview value={output} /> : <Editor label="Edited result" value={output} readOnly isMarkdown={format === 'markdown'} changes={rightTab === 'changes' ? diff.after : []} changeKind="added" retained={issues.map(issue => ({ from: issue.outputFrom, to: issue.outputTo }))} reveal={resultReveal} /> : busy ? <div className="waiting-result" role="status"><span className="spinner" />Waiting for your model…</div> : <div className="empty-result"><span className="empty-result-symbol"><FilePenLine size={27} strokeWidth={1.4} /></span><p>A little clearer.<br />Still yours.</p><span>Your edit will appear here, one passage at a time.</span><div className="diff-key"><span><i className="removed-key" />Removed</span><span><i className="added-key" />Added</span><span><i className="locked-key" />Protected</span></div></div>}
           </div>
-          {!!issues.length && !busy && <RetainedReview issues={issues} source={source} active={resultReveal} onLocate={locateRetained} />}
+          {!!issues.length && (!busy || retrying !== null) && <RetainedReview issues={issues} source={source} active={resultReveal} onLocate={locateRetained} onRetry={issue => void retryOne(issue)} retrying={retrying} />}
           <footer className="panel-footer"><div className="footer-actions"><button onClick={() => void copy(output)} disabled={!output || busy}><Copy size={14} />Copy</button><button onClick={() => download(output)} disabled={!output || busy}><Download size={14} />Export</button></div><button className="text-button" disabled={!output || busy} onClick={() => { if (window.confirm('Use this edit as the new draft?')) { replaceSource(output); } }}><Check size={14} />Use as draft</button></footer>
         </section>
       </div>
 
       <div className="edit-bar">
-        <div className="edit-status" role="status" aria-live="polite">{busy ? <><span className="spinner" />{progress?.retry ? 'Checking locks again' : 'Editing'}<span className="muted">{progress?.done ?? 0}/{progress?.total ?? '…'} passages</span></> : status ? <><ShieldCheck size={15} /><span>{status}</span></> : <><LockKeyhole size={15} /><span>Select text to keep it word for word.</span></>}</div>
+        <div className="edit-status" role="status" aria-live="polite">{busy ? <><span className="spinner" />{retrying !== null ? progress?.retry ? 'Checking passage locks again' : 'Retrying passage' : progress?.retry ? 'Checking locks again' : 'Editing'}{retrying === null && <span className="muted">{progress?.done ?? 0}/{progress?.total ?? '…'} passages</span>}</> : status ? <><ShieldCheck size={15} /><span>{status}</span></> : <><LockKeyhole size={15} /><span>Select text to keep it word for word.</span></>}</div>
         <button id="run-edit" className={'primary-button ' + (busy ? 'stop-button' : '')} disabled={!busy && !source.trim()} onClick={() => void run()}>{busy ? <Square size={15} /> : <Play size={15} fill="currentColor" />}{busy ? 'Stop' : 'Edit draft'}{!busy && <kbd>{shortcut} ↵</kbd>}</button>
       </div>
       {output && !busy && <div className="review-bar"><label className="check-label"><input type="checkbox" checked={showDiff} onChange={e => setShowDiff(e.target.checked)} />Show changes</label><div className="change-navigation"><span>{diff.before.length} removals · {diff.after.length} additions</span><button aria-label="Previous change" disabled={!diff.before.length} onClick={() => navigateChange(-1)}><ChevronLeft size={15} /></button><button aria-label="Next change" disabled={!diff.before.length} onClick={() => navigateChange(1)}><ChevronRight size={15} /></button></div></div>}
@@ -279,7 +321,7 @@ export default function App() {
         {panel === 'prompt' && <div className="dialog-content"><div className="preset-chips">{PRESETS.map(p => <button key={p.id} className={settings.preset === p.id ? 'selected' : ''} onClick={() => preset(p.id)}>{p.name}</button>)}</div><label>System prompt<textarea className="prompt-textarea" value={settings.prompt} onChange={e => setSettings(s => ({ ...s, preset: 'custom', prompt: e.target.value }))} /></label><p className="dialog-description">Applied to every passage. Lock checks run after generation.</p><div className="field-row"><button className="secondary-button" onClick={() => preset('article')}><RotateCcw size={14} />Reset</button><button className="primary-button" onClick={() => setPanel(null)}>Done<Check size={15} /></button></div></div>}
         {panel === 'locks' && <div className="dialog-content"><p className="dialog-description">Automatic rules plus any text you select and lock.</p><label>Document type<select value={format} onChange={e => { setFormat(e.target.value as Format); setLeftTab('source'); invalidate(); }}><option value="markdown">Markdown</option><option value="email">Email</option><option value="text">Plain text</option></select></label><div className="lock-options">{([['structure', 'Structure & notation', 'Blocks, markers, and line breaks'], ['inline', 'Code & links', 'Inline code, addresses, and link notation'], ['numbers', 'Numbers', 'Values, dates, and percentages'], ['signature', 'Email signature', 'Closing and quoted thread']] as const).map(([key, title, description]) => <label className="rule-toggle" key={key}><input type="checkbox" checked={settings.locks[key]} onChange={e => { setSettings(s => ({ ...s, locks: { ...s.locks, [key]: e.target.checked } })); invalidate(); }} /><span><b>{title}</b><small>{description}</small></span></label>)}</div><div className="lock-list">{manual.map((r, i) => <div key={i}><LockKeyhole size={13} /><span>{source.slice(r.from, r.to)}</span><button aria-label={'Remove lock ' + (i + 1)} onClick={() => { setManual(m => m.filter((_, j) => j !== i)); invalidate(); }}><X size={13} /></button></div>)}{!manual.length && <p className="muted">Select a passage in Source, then choose Lock selection.</p>}</div><span className="muted">{locks.length} protected ranges. Signatures are detected in Email mode; select unusual signatures manually.</span><button className="primary-button full" onClick={() => setPanel(null)}>Done<Check size={15} /></button></div>}
         {panel === 'history' && <div className="dialog-content"><div className="history-head"><span className="muted">{settings.saveDrafts ? 'Saved on this device.' : 'This tab only.'} Up to 12 edits.</span><button className="text-button" disabled={!history.length} onClick={() => { setHistory([]); remove('history'); }}><Trash2 size={14} />Clear</button></div>{history.length ? history.map(h => <button key={h.id} className="history-entry" onClick={() => historyLoad(h)}><span><b>{h.name}</b><small>{new Date(h.at).toLocaleString()} · {words(h.source)} words</small></span><ArrowRight size={16} /></button>) : <div className="history-empty"><History size={25} /><p>Your edits will appear here.</p></div>}</div>}
-        {panel === 'help' && <div className="dialog-content help-content"><p>Connect a model, paste a draft, and choose an editing preset. Select any text in Source and choose <b>Lock as fact</b> to keep it unchanged.</p><p><b>Markdown</b> keeps recognized code blocks, tables, heading markers, links, and line breaks. Heading wording stays editable. <b>Email</b> detects common signatures. Protected text is blue.</p><p>Each passage is checked after generation. A failed check gets one retry. If it still fails, the original passage stays. Find it at the bottom of Edited and choose <b>Show passage</b> to locate it.</p><p>Read the result before using it. Text outside locks can still change meaning. Use a model that follows system instructions and copies markers accurately.</p><p>Your draft goes directly to the server you choose. Settings stay in this browser; saving drafts and API keys is optional. Preview does not load external images.</p><p><b>Connection trouble?</b> Enable CORS, allow the browser’s local-network permission, and check your server address. Use HTTPS for a remote server. If your browser blocks a local connection from GitHub Pages, run EditTrace locally with <code>npm run dev</code>.</p><a href="https://github.com/rajmayank/EditTrace" target="_blank" rel="noreferrer" className="source-link">Source & setup<ArrowUpRight size={13} /></a></div>}
+        {panel === 'help' && <div className="dialog-content help-content"><p>Connect a model, paste a draft, and choose an editing preset. Select any text in Source and choose <b>Lock as fact</b> to keep it unchanged.</p><p><b>Markdown</b> keeps recognized code blocks, tables, heading markers, links, and line breaks. Heading wording stays editable. <b>Email</b> detects common signatures. Protected text is blue.</p><p>Each passage is checked after generation. A failed check gets one retry. If it still fails, the original passage stays. In Edited, choose <b>Show passage</b> to locate it or <b>Retry</b> to run just that passage again. Other edits stay in place.</p><p>Read the result before using it. Text outside locks can still change meaning. Use a model that follows system instructions and copies markers accurately.</p><p>Your draft goes directly to the server you choose. Settings stay in this browser; saving drafts and API keys is optional. Preview does not load external images.</p><p><b>Connection trouble?</b> Enable CORS, allow the browser’s local-network permission, and check your server address. Use HTTPS for a remote server. If your browser blocks a local connection from GitHub Pages, run EditTrace locally with <code>npm run dev</code>.</p><a href="https://github.com/rajmayank/EditTrace" target="_blank" rel="noreferrer" className="source-link">Source & setup<ArrowUpRight size={13} /></a></div>}
       </div>
     </dialog>
   </div>;
