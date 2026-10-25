@@ -1,0 +1,26 @@
+{
+  "name": "main: required CI",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": ["refs/heads/main"],
+      "exclude": []
+    }
+  },
+  "bypass_actors": [],
+  "rules": [
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "required_status_checks": [
+          {
+            "context": "check",
+            "integration_id": 15368
+          }
+        ],
+        "strict_required_status_checks_policy": false
+      }
+    }
+  ]
+}
