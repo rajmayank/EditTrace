@@ -14,12 +14,15 @@ async function failedDocument() {
 
 describe('retrying a retained passage', () => {
   it('submits only the chosen original passage, masks its facts, and shifts later review targets', async () => {
+    // Numeric marker IDs are not leaked passage content.
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue('42000000-6400-4000-8000-000000000000');
     const original = await failedDocument(), target = original.issues[0];
     const seen: PassageProgress[] = [];
     const generate: typeof complete = vi.fn(async (_c, system, input, _signal, onText) => {
       expect(system).toContain('New editing instructions');
       expect(input).toContain('FIRST_FAIL');
-      for (const excluded of ['SECOND_FAIL', 'concrete', 'final approved', '42', 'exact limit']) expect(input).not.toContain(excluded);
+      const visibleInput = input.replace(/\[\[ET_[^\]]+\]\]/g, '');
+      for (const excluded of ['SECOND_FAIL', 'concrete', 'final approved', '42', 'exact limit']) expect(visibleInput).not.toContain(excluded);
       const text = input.replace('FIRST_FAIL', 'The recovered first passage');
       onText(text.slice(0, 16)); onText(text); return text;
     });

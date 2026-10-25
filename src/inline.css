@@ -1,0 +1,21 @@
+.result-panel .panel-header { flex-wrap: wrap; row-gap: 8px; }
+.result-panel .panel-title { flex: 1; min-width: 100px; }
+.result-panel .segmented { flex-shrink: 0; margin-left: auto; }
+.result-source { height: 100%; }
+.editing-result { border-color: color-mix(in srgb, var(--accent) 65%, var(--line)); }
+.result-panel .cm-line .locked,
+.result-panel .cm-line .locked * {
+  color: var(--blue-text);
+  background: var(--blue);
+  text-decoration: none;
+  box-shadow: none;
+}
+.result-edit-note {
+  margin: 0;
+  padding: 8px 18px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+  background: var(--subtle);
+  border-bottom: 1px solid var(--line);
+}
