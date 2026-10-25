@@ -1,6 +1,6 @@
 import type { Connection, Format, Span, LockOptions } from './types';
 export type Draft = { source: string; output: string; manual: Span[]; format: Format; name: string };
-export type SavedSettings = { connection: Connection; rememberKey: boolean; saveDrafts: boolean; theme: string; preset: string; prompt: string; locks: LockOptions };
+export type SavedSettings = { connection: Connection; connectionEnabled?: boolean; provider?: string; rememberKey: boolean; saveDrafts: boolean; theme: string; preset: string; prompt: string; locks: LockOptions };
 export const PREFIX = 'edittrace.v1.';
 export function read<T>(key: string, fallback: T): T {
   try { const raw = localStorage.getItem(PREFIX + key); return raw ? JSON.parse(raw) as T : fallback; } catch { return fallback; }

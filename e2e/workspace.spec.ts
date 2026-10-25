@@ -38,7 +38,7 @@ test('desktop: connection, real streaming, diff, previews, and both themes', asy
   await page.screenshot({ path: info.outputPath('desktop-light.png'), fullPage: true, animations: 'disabled' });
   await page.getByRole('button', { name: 'Toggle theme' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await expect(page.locator('.draft-panel .cm-editor')).toHaveCSS('background-color', 'rgb(27, 39, 32)');
+  await expect(page.locator('.draft-panel .cm-editor')).toHaveCSS('background-color', 'rgb(27, 30, 37)');
   for (const selector of ['.footer-meta', '.removed', '.added', '.et-link']) expect(await contrast(page, selector), selector).toBeGreaterThanOrEqual(4.5);
   await page.screenshot({ path: info.outputPath('desktop-dark.png'), fullPage: true, animations: 'disabled' });
   await page.getByRole('button', { name: 'Preview', exact: true }).click();

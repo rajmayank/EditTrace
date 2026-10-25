@@ -1,26 +1,57 @@
 :root {
-  --muted: #65746b;
-  --link: #276d9c;
-  --syntax: #526a59;
+  color-scheme: light;
+  color: var(--text);
+  background: var(--bg);
+  --bg: #f6f6fa;
+  --surface: #ffffff;
+  --subtle: #f5f6fb;
+  --text: #29303c;
+  --muted: #667085;
+  --line: #e0e3ec;
+  --accent: #535fc5;
+  --accent-soft: #edf0ff;
+  --link: #276291;
+  --syntax: #59617b;
   --ease: cubic-bezier(.2, .7, .2, 1);
 }
 
 :root[data-theme=dark] {
-  --bg: #121b17;
-  --surface: #1b2720;
-  --subtle: #202f26;
-  --text: #e5ece6;
-  --muted: #a0b3a6;
-  --line: #34483b;
-  --link: #a8d4f2;
-  --syntax: #abc3b2;
-  --blue: #293f53;
+  color-scheme: dark;
+  --bg: #111318;
+  --surface: #1b1e25;
+  --subtle: #232731;
+  --text: #edf0f7;
+  --muted: #a3adc0;
+  --line: #353b49;
+  --accent: #b6bfff;
+  --accent-soft: #2c314b;
+  --link: #a5d2f7;
+  --syntax: #bec5d8;
+  --blue: #293d58;
   --blue-text: #bfd8f5;
   --red-bg: #55332f;
   --red: #ffc3b7;
   --green-bg: #354f2c;
   --green: #d3efbd;
 }
+
+html, body, #root { min-height: 100%; background: var(--bg); }
+body, #root, .app-shell { min-height: 100dvh; }
+.app-shell { display: flex; flex-direction: column; }
+main { width: 100%; flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.workspace { flex: 1 0 420px; height: auto; min-height: 420px; max-height: none; }
+.editor-panel { height: auto; min-height: 0; }
+.brand-logo { width: 37px; height: 37px; flex-shrink: 0; transform: rotate(-5deg); transition: transform 200ms var(--ease); }
+.brand:hover .brand-logo { transform: rotate(3deg); }
+.privacy-note { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; line-height: 1.6; margin: -9px 0 19px; }
+.privacy-note svg { color: var(--accent); }
+.privacy-note strong { color: var(--text); font-weight: 550; margin-right: 4px; }
+.attribution a { color: var(--text); }
+.attribution a span { color: var(--muted); margin-left: 5px; }
+.waiting-result { height: 100%; min-height: 150px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 13px; color: var(--muted); }
+.connection-pill[data-connection-state=checking] .dot { background: #c89437; animation: connection-pulse 1s ease-in-out infinite; }
+.connection-pill[data-connection-state=error] .dot { background: var(--red); }
+@keyframes connection-pulse { 50% { opacity: .35; } }
 
 body, .topbar, .editor-panel, .panel-header, .panel-footer, .cm-editor,
 .segmented, .connection-pill, dialog, .edit-bar, .mobile-panes,
@@ -115,6 +146,9 @@ dialog[open]::backdrop { animation: backdrop-enter 180ms ease-out both; }
 }
 
 @media (max-width: 700px) {
+  .brand-logo { width: 32px; height: 32px; }
+  .privacy-note { align-items: flex-start; font-size: 10px; margin: -8px 0 16px; }
+  .privacy-note svg { margin-top: 2px; }
   .github-link { display: none; }
   .document-bar { gap: 12px; }
   .document-title { min-width: 0; flex: 1; }
@@ -142,13 +176,14 @@ dialog[open]::backdrop { animation: backdrop-enter 180ms ease-out both; }
     color: var(--text);
     box-shadow: 0 1px 3px #0001;
   }
-  .workspace { display: block; }
+  .workspace { display: flex; flex-direction: column; flex: 1 0 330px; min-height: 330px; }
   .workspace[data-mobile-pane=original] .result-panel,
   .workspace[data-mobile-pane=edited] .draft-panel { display: none; }
   .editor-panel {
-    height: calc(100dvh - 372px);
+    height: auto;
+    flex: 1;
     min-height: 330px;
-    max-height: 900px;
+    max-height: none;
   }
   .workspace-controls { margin-bottom: 12px; min-height: 49px; }
   .protection-summary { max-width: 190px; }
@@ -163,11 +198,13 @@ dialog[open]::backdrop { animation: backdrop-enter 180ms ease-out both; }
   .panel-title .word-count { font-size: 10px; }
   .app-footer { line-height: 1.6; padding-top: 12px; gap: 8px 18px; }
   .app-footer, .app-footer .check-label { font-size: 10px; }
+  .app-footer .attribution { width: 100%; text-align: center; }
   .empty-result > span:last-of-type { font-size: 12px; }
   .diff-key { font-size: 11px; }
 }
 
 @media (max-width: 360px) {
+  .brand-logo { width: 28px; height: 28px; }
   .topbar { padding: 0 12px; }
   .brand { font-size: 18px; gap: 6px; }
   .brand-mark { width: 26px; height: 28px; padding-left: 5px; }
