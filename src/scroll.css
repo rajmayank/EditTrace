@@ -1,0 +1,15 @@
+.middle-rail .scroll-link {
+  min-width: 26px;
+  min-height: 30px;
+  padding: 5px;
+  color: var(--muted);
+}
+
+.middle-rail .scroll-link[aria-pressed=true] {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.middle-rail .scroll-link svg { width: 16px; }
+.preview-scroll-anchor { display: block; height: 0; }
+.markdown-preview > :nth-child(1 of :not(.preview-scroll-anchor)) { margin-top: 0; }

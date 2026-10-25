@@ -1,12 +1,13 @@
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { diffWordsWithSpace } from 'diff';
-import { ArrowRight, ArrowUpRight, Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, CircleCheck, CircleAlert, Clipboard, Copy, Download, FilePenLine, FileUp, History, LockKeyhole, MessageSquarePlus, Moon, Play, Plus, RotateCcw, Settings2, ShieldCheck, Square, Sun, Trash2, Unplug, X } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, CircleCheck, CircleAlert, Clipboard, Copy, Download, FilePenLine, FileUp, History, Link2, LockKeyhole, MessageSquarePlus, Moon, Play, Plus, RotateCcw, Settings2, ShieldCheck, Square, Sun, Trash2, Unlink, Unplug, X } from 'lucide-react';
 import { Editor } from './Editor';
 import { Preview } from './Preview';
 import { autoLocks } from './core/protection';
 import { baseURL, connectionError } from './core/api';
 import { PROVIDERS, providerFor } from './core/providers';
 import { useModelConnection } from './useModelConnection';
+import { useLinkedScroll } from './useLinkedScroll';
 import { Logo } from './Logo';
 import { RetainedReview } from './RetainedReview';
 import { ReadingStats } from './ReadingStats';
@@ -19,7 +20,7 @@ import { draftTitle, PRESETS, SAMPLE } from './core/presets';
 import { persistSettings, read, remove, write, type Draft, type SavedSettings } from './core/storage';
 
 const DEFAULT_CONNECTION: Connection = { url: 'http://localhost:1234/v1', model: '', key: '', temperature: 0.3, maxTokens: 4096 };
-const defaults: SavedSettings = { connection: DEFAULT_CONNECTION, connectionEnabled: true, rememberKey: false, saveDrafts: false, theme: window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light', preset: 'article', prompt: PRESETS[0].prompt, locks: DEFAULT_LOCKS };
+const defaults: SavedSettings = { connection: DEFAULT_CONNECTION, connectionEnabled: true, linkedScroll: true, rememberKey: false, saveDrafts: false, theme: window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light', preset: 'article', prompt: PRESETS[0].prompt, locks: DEFAULT_LOCKS };
 const shortcut = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
 type Entry = Draft & { at: number; id: string };
 type Panel = 'connection' | 'prompt' | 'locks' | 'history' | 'help' | null;
@@ -30,6 +31,7 @@ export default function App() {
     return { ...defaults, ...s, connection: { ...DEFAULT_CONNECTION, ...s.connection }, locks: { ...DEFAULT_LOCKS, ...s.locks } };
   });
   const [initial] = useState(() => settings.saveDrafts ? read<Draft | null>('draft', null) : null);
+  const linkedScroll = settings.linkedScroll !== false;
   const [source, setSource] = useState(initial?.source ?? '');
   const [output, setOutput] = useState(initial?.output ?? '');
   const [format, setFormat] = useState<Format>(initial?.format ?? 'markdown');
@@ -45,6 +47,7 @@ export default function App() {
   const [manualModel, setManualModel] = useState(false);
   const [panel, setPanel] = useState<Panel>(null);
   const [leftTab, setLeftTab] = useState('source'), [rightTab, setRightTab] = useState('changes');
+  const scrolling = useLinkedScroll(linkedScroll, leftTab, rightTab);
   const [mobilePane, setMobilePane] = useState('original');
   const [showDiff, setShowDiff] = useState(true);
   const [originalReveal, setOriginalReveal] = useState<Reveal>(), [resultReveal, setResultReveal] = useState<Reveal>();
@@ -294,20 +297,20 @@ export default function App() {
         <button aria-pressed={mobilePane === 'original'} className={mobilePane === 'original' ? 'active' : ''} onClick={() => setMobilePane('original')}><span>01</span>Original</button>
         <button aria-pressed={mobilePane === 'edited'} className={mobilePane === 'edited' ? 'active' : ''} onClick={() => setMobilePane('edited')}><span>02</span>Edited{output && <i className="result-dot" />}</button>
       </div>
-      <div className="workspace" data-mobile-pane={mobilePane} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); void importFile(e.dataTransfer.files[0]); }}>
+      <div className="workspace" data-mobile-pane={mobilePane} onScrollCapture={scrolling.onScrollCapture} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); void importFile(e.dataTransfer.files[0]); }}>
         <section className="editor-panel draft-panel" aria-label="Draft panel">
           <header className="panel-header"><div className="panel-title"><span className="panel-number">01</span><h1>Original</h1><ReadingStats estimate={originalReading} label="Original" /></div><div className="segmented" role="group" aria-label="Original view"><button className={leftTab === 'source' ? 'active' : ''} onClick={() => setLeftTab('source')}>Source</button><button className={leftTab === 'preview' ? 'active' : ''} onClick={() => setLeftTab('preview')} disabled={format !== 'markdown'}>Preview</button></div></header>
           <div className="editor-body">
-            {leftTab === 'preview' ? <Preview value={source} /> : <Editor label="Original draft" value={source} readOnly={busy} isMarkdown={format === 'markdown'} locks={locks} changes={diff.before} changeKind="removed" onChange={changeSource} onSelection={setSelection} onLockSelection={lockRange} reveal={originalReveal} />}
+            {leftTab === 'preview' ? <Preview value={source} scrollRef={scrolling.original} /> : <Editor label="Original draft" value={source} scrollRef={scrolling.original} readOnly={busy} isMarkdown={format === 'markdown'} locks={locks} changes={diff.before} changeKind="removed" onChange={changeSource} onSelection={setSelection} onLockSelection={lockRange} reveal={originalReveal} />}
             {!source && leftTab === 'source' && <div className="empty-draft"><span className="empty-eyebrow">START WITH YOUR DRAFT</span><p>Good writing starts here.</p><span>Paste your words, or drop a Markdown or text file.</span><button className="sample-button" disabled={busy} onClick={() => { preset('article'); replaceSource(SAMPLE, 'Connection limits.md'); }}>Try a sample <ArrowRight size={14} /></button></div>}
           </div>
           <footer className="panel-footer"><div className="footer-actions"><button onClick={async () => { try { const value = await navigator.clipboard.readText(); if (!busyRef.current) replaceSource(value); } catch { setNotice('Use ⌘V or Ctrl+V in the editor to paste.'); } }} disabled={busy}><Clipboard size={14} />Paste</button><button onClick={() => importRef.current?.click()} disabled={busy}><FileUp size={14} />Import</button><button className="icon-button" title="Download original" aria-label="Download original" onClick={() => download(source, false)} disabled={!source || busy}><Download size={14} /></button></div><span className="footer-meta">{format === 'markdown' ? 'Markdown' : format === 'email' ? 'Email' : 'Plain text'}<span className="dot-separator">·</span>{source.length.toLocaleString()} chars</span></footer>
         </section>
-        <div className="middle-rail"><span><ArrowRight size={18} /></span></div>
+        <div className="middle-rail"><button className="scroll-link" aria-label="Link scrolling" aria-pressed={linkedScroll} title={linkedScroll ? 'Linked scrolling on. Click to scroll independently.' : 'Link scrolling between panes.'} disabled={!output} onClick={() => setSettings(s => ({ ...s, linkedScroll: !linkedScroll }))}>{linkedScroll ? <Link2 size={16} /> : <Unlink size={16} />}</button></div>
         <section ref={resultPanel} className="editor-panel result-panel" aria-label="Edited panel">
           <header className="panel-header"><div className="panel-title"><span className="panel-number">02</span><h2>Edited</h2>{output && <ReadingStats estimate={editedReading} label="Edited" />}</div><div className="segmented" role="group" aria-label="Edited view"><button className={rightTab === 'changes' ? 'active' : ''} onClick={() => setRightTab('changes')}>Changes</button><button className={rightTab === 'read' ? 'active' : ''} onClick={() => setRightTab('read')}>Read</button></div></header>
           <div className="editor-body">
-            {output ? rightTab === 'read' && format === 'markdown' ? <Preview value={output} /> : <Editor label="Edited result" value={output} readOnly isMarkdown={format === 'markdown'} changes={rightTab === 'changes' ? diff.after : []} changeKind="added" retained={issues.map(issue => ({ from: issue.outputFrom, to: issue.outputTo }))} reveal={resultReveal} /> : busy ? <div className="waiting-result" role="status"><span className="spinner" />Waiting for your model…</div> : <div className="empty-result"><span className="empty-result-symbol"><FilePenLine size={27} strokeWidth={1.4} /></span><p>A little clearer.<br />Still yours.</p><span>Your edit will appear here, one passage at a time.</span><div className="diff-key"><span><i className="removed-key" />Removed</span><span><i className="added-key" />Added</span><span><i className="locked-key" />Protected</span></div></div>}
+            {output ? rightTab === 'read' && format === 'markdown' ? <Preview value={output} scrollRef={scrolling.edited} /> : <Editor label="Edited result" value={output} scrollRef={scrolling.edited} readOnly isMarkdown={format === 'markdown'} changes={rightTab === 'changes' ? diff.after : []} changeKind="added" retained={issues.map(issue => ({ from: issue.outputFrom, to: issue.outputTo }))} reveal={resultReveal} /> : busy ? <div className="waiting-result" role="status"><span className="spinner" />Waiting for your model…</div> : <div className="empty-result"><span className="empty-result-symbol"><FilePenLine size={27} strokeWidth={1.4} /></span><p>A little clearer.<br />Still yours.</p><span>Your edit will appear here, one passage at a time.</span><div className="diff-key"><span><i className="removed-key" />Removed</span><span><i className="added-key" />Added</span><span><i className="locked-key" />Protected</span></div></div>}
           </div>
           {!!issues.length && (!busy || retrying !== null) && <RetainedReview issues={issues} source={source} active={resultReveal} onLocate={locateRetained} onRetry={issue => void retryOne(issue)} retrying={retrying} />}
           <footer className="panel-footer"><div className="footer-actions"><button onClick={() => void copy(output)} disabled={!output || busy}><Copy size={14} />Copy</button><button onClick={() => download(output)} disabled={!output || busy}><Download size={14} />Export</button></div><button className="text-button" disabled={!output || busy} onClick={() => { if (window.confirm('Use this edit as the new draft?')) { replaceSource(output); } }}><Check size={14} />Use as draft</button></footer>

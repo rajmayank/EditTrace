@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useImperativeHandle, useRef, type Ref } from 'react';
 import { basicSetup } from 'codemirror';
 import { Annotation, Compartment, EditorSelection, EditorState, StateEffect, StateField } from '@codemirror/state';
 import { Decoration, EditorView, showTooltip, tooltips, type DecorationSet, type Tooltip } from '@codemirror/view';
@@ -6,6 +6,7 @@ import { markdown } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import type { Lock, Reveal, Span } from './core/types';
+import { documentBlocks, type ScrollSurface } from './core/scroll';
 
 const external = Annotation.define<boolean>();
 const proseHighlight = HighlightStyle.define([
@@ -30,6 +31,7 @@ export type EditorProps = {
   value: string; label: string; readOnly?: boolean; isMarkdown?: boolean;
   locks?: Lock[]; changes?: Span[]; changeKind?: 'added' | 'removed';
   retained?: Span[]; reveal?: Reveal;
+  scrollRef?: Ref<ScrollSurface>;
   onChange?: (value: string, map: (ranges: Span[]) => Span[]) => void;
   onSelection?: (range: Span) => void;
   onLockSelection?: (range: Span) => void;
@@ -37,7 +39,24 @@ export type EditorProps = {
 export function Editor(props: EditorProps) {
   const host = useRef<HTMLDivElement>(null), view = useRef<EditorView | null>(null), latest = useRef(props);
   const mode = useRef(new Compartment()), language = useRef(new Compartment());
+  const blockCache = useRef<{ value: string; markdown: boolean; blocks: ReturnType<typeof documentBlocks> } | null>(null);
   latest.current = props;
+  useImperativeHandle(props.scrollRef, () => ({
+    element: () => view.current?.scrollDOM ?? null,
+    blocks: () => {
+      const v = view.current;
+      if (!v) return [];
+      const { value, isMarkdown } = latest.current;
+      if (blockCache.current?.value !== value || blockCache.current.markdown !== !!isMarkdown) {
+        blockCache.current = { value, markdown: !!isMarkdown, blocks: documentBlocks(value, !!isMarkdown) };
+      }
+      const padding = v.documentPadding.top;
+      return blockCache.current.blocks.map(block => ({
+        top: v.lineBlockAt(v.state.doc.line(Math.min(block.fromLine, v.state.doc.lines)).from).top + padding,
+        bottom: v.lineBlockAt(v.state.doc.line(Math.min(block.toLine, v.state.doc.lines)).to).bottom + padding,
+      }));
+    },
+  }), []);
   useEffect(() => {
     const factTooltip = StateField.define<readonly Tooltip[]>({
       create: () => [],

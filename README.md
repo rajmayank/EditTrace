@@ -9,7 +9,7 @@ It runs entirely in your browser and connects directly to your model provider. N
 - **See what changed.** The original stays on the left; the right starts empty and fills as tokens arrive. Removals are red and struck through, additions are green, and protected text is blue.
 - **Choose the editing pass.** Start with Technical article, Markdown edit, Email polish, or Light copyedit. Change the system prompt when you need different instructions.
 - **Protect what matters.** Select your own facts or use automatic rules for Markdown structure, signatures, and numbers. A failed check gets one automatic retry, then the original passage is retained and flagged.
-- **Review at your own pace.** Switch between source, diff, and sanitized Markdown preview. Retry individual retained passages, copy or export the result, and use an edit as the next draft.
+- **Review at your own pace.** Switch between source, diff, and sanitized Markdown preview. Link scrolling to keep corresponding blocks in view, or scroll each pane independently. Retry individual retained passages, copy or export the result, and use an edit as the next draft.
 - **Keep the workspace comfortable.** Light and dark themes, responsive panels, keyboard controls, and reduced-motion support work alongside live word counts, reading estimates, and output speed.
 
 ## Start editing
@@ -53,6 +53,8 @@ Protected ranges are replaced with unique markers before a passage goes to the m
 If a passage fails twice, its original text stays in the result. Open the collapsed summary at the bottom of **Edited** to see excerpts and reasons in a bounded, scrollable list. **Show passage** locates the text. **Retry** runs only that original passage with your current model, instructions, and locks; accepted edits stay in place. A failed or stopped retry keeps the previous result and flag.
 
 These checks preserve literal text and recognized structure. They don't verify factual accuracy or cover every Markdown extension and email format. Check the protected ranges and read the revision.
+
+Scrolling is linked by default on side-by-side layouts. The chain button between the panes switches it off or on, and the choice stays in this browser. Headings, paragraphs, lists, and code blocks align by document order; movement within a rewritten block is proportional. This works across Source, Changes, Preview, and Read. During streaming, alignment stops at received content. On mobile, the visible pane scrolls independently.
 
 ## Live metrics
 
