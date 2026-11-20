@@ -6,7 +6,7 @@ EditTrace edits the prose around your document's structure. It protects recogniz
 
 Use LM Studio or another OpenAI-compatible provider. The app runs in your browser and connects directly to your model. No account, app backend, or bundled model is required.
 
-[Open EditTrace](https://rajmayank.github.io/EditTrace/) · [Contribute](CONTRIBUTING.md) · [Report an issue](https://github.com/rajmayank/EditTrace/issues/new)
+[Open EditTrace](https://edittrace.apps.mayankraj.com/) · [Contribute](CONTRIBUTING.md) · [Report an issue](https://github.com/rajmayank/EditTrace/issues/new)
 
 ## How the skeleton survives
 
@@ -27,7 +27,7 @@ Protection and validation run in [the browser's editing code](src/core/engine.ts
 
 ## Start editing
 
-1. Start LM Studio's local server or choose another OpenAI-compatible provider. Enable CORS for the editor's origin, `https://rajmayank.github.io` when using GitHub Pages.
+1. Start LM Studio's local server or choose another OpenAI-compatible provider. Enable CORS for the editor's origin, `https://edittrace.apps.mayankraj.com` for the hosted app.
 2. Open **Connect a model**, choose a preset or enter your server URL, and select **Test connection**. Check the status below the button, then choose a discovered model or enter its ID.
 3. Paste a draft, or import or drop a `.md` or `.txt` file. Choose an editing preset and adjust **Instructions** if needed.
 4. Check the blue protected ranges, add any fact locks, and select **Edit draft**. Review the result before copying or exporting it.
